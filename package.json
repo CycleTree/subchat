@@ -1,0 +1,23 @@
+{
+  "name": "@subchat/root",
+  "version": "0.1.0",
+  "private": true,
+  "description": "OpenClaw サブエージェント会話観測UI",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=@subchat/ui",
+    "build": "npm run build --workspace=@subchat/ui",
+    "clean": "rm -rf node_modules packages/*/node_modules packages/*/dist",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=18",
+    "npm": ">=9"
+  }
+}
