@@ -13,8 +13,7 @@
           buildInputs = with pkgs; [
             nodejs_22
             playwright
-            playwright-driver.chromium
-            steam-run
+            chromium
           ];
           
           shellHook = ''
@@ -28,20 +27,6 @@
             echo "Usage:"
             echo "  npm run dev     # Start subchat"
             echo "  npm run test    # Run tests with Playwright"
-          '';
-        };
-        
-        # Alternative development shell with steam-run for compatibility
-        devShells.compat = pkgs.mkShell {
-          buildInputs = with pkgs; [
-            nodejs_22
-            steam-run
-            chromium
-          ];
-          
-          shellHook = ''
-            echo "🐧 NixOS compatibility mode"
-            echo "Run with: steam-run node script.js"
           '';
         };
       });

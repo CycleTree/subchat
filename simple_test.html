@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>SubChat Browser Test</title>
+    <script>
+        window.onload = function() {
+            console.log('=== SubChat Test Start ===');
+            
+            // Create iframe to load the actual app
+            const iframe = document.createElement('iframe');
+            iframe.src = 'http://localhost:3000';
+            iframe.style.width = '100%';
+            iframe.style.height = '600px';
+            iframe.style.border = '1px solid #ccc';
+            
+            iframe.onload = function() {
+                console.log('✅ SubChat app loaded in iframe');
+                
+                setTimeout(() => {
+                    try {
+                        const iframeDoc = iframe.contentDocument;
+                        if (iframeDoc) {
+                            const title = iframeDoc.querySelector('h1');
+                            console.log('📝 App title:', title ? title.textContent : 'Not found');
+                            
+                            const status = iframeDoc.querySelector('[style*="border-radius: 50%"]');
+                            if (status) {
+                                console.log('🔗 Connection status element found');
+                                console.log('🎨 Status styles:', status.style.cssText);
+                            }
+                            
+                            // Check console messages in iframe
+                            const logs = [];
+                            const originalConsole = iframe.contentWindow.console;
+                            ['log', 'error', 'warn'].forEach(method => {
+                                iframe.contentWindow.console[method] = function(...args) {
+                                    logs.push(`${method.toUpperCase()}: ${args.join(' ')}`);
+                                    originalConsole[method].apply(originalConsole, args);
+                                };
+                            });
+                            
+                            setTimeout(() => {
+                                console.log('📋 Iframe console logs:', logs);
+                            }, 2000);
+                            
+                        } else {
+                            console.log('❌ Cannot access iframe content (CORS)');
+                        }
+                    } catch (e) {
+                        console.log('❌ Iframe access error:', e.message);
+                    }
+                }, 1000);
+            };
+            
+            iframe.onerror = function() {
+                console.log('❌ Failed to load SubChat app');
+            };
+            
+            document.body.appendChild(iframe);
+            
+            // Test direct connection
+            console.log('🔌 Testing direct WebSocket connection...');
+            try {
+                const ws = new WebSocket('ws://localhost:18792/gateway?token=3a46fc7cb69ecda092d43712ed997b7c8ffd5b4449a97c2f');
+                
+                ws.onopen = () => {
+                    console.log('✅ Direct WebSocket connected');
+                };
+                
+                ws.onmessage = (event) => {
+                    console.log('📨 Direct WS message:', event.data);
+                };
+                
+                ws.onerror = (error) => {
+                    console.log('❌ Direct WS error:', error);
+                };
+                
+                ws.onclose = () => {
+                    console.log('🔌 Direct WebSocket closed');
+                };
+            } catch (e) {
+                console.log('❌ WebSocket test error:', e.message);
+            }
+        };
+    </script>
+</head>
+<body>
+    <h1>SubChat Browser Test</h1>
+    <div>Check browser console (F12) for detailed logs</div>
+    <br>
+    <!-- iframe will be inserted here -->
+</body>
+</html>

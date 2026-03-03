@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug SubChat</title>
+</head>
+<body>
+    <h1>Debug SubChat Connection</h1>
+    <div id="status">Testing...</div>
+    <div id="log"></div>
+
+    <script>
+        const statusDiv = document.getElementById('status');
+        const logDiv = document.getElementById('log');
+        
+        function log(message) {
+            console.log(message);
+            logDiv.innerHTML += '<p>' + new Date().toLocaleTimeString() + ': ' + message + '</p>';
+        }
+
+        // Test WebSocket connection
+        try {
+            log('Attempting to connect to WebSocket...');
+            const ws = new WebSocket('ws://localhost:18800/gateway');
+            
+            ws.onopen = function() {
+                statusDiv.textContent = 'WebSocket Connected ✅';
+                log('WebSocket connection opened');
+                
+                // Test sessions_list
+                const request = {
+                    id: '1',
+                    method: 'sessions_list',
+                    params: {}
+                };
+                
+                ws.send(JSON.stringify(request));
+                log('Sent sessions_list request');
+            };
+            
+            ws.onmessage = function(event) {
+                log('Received: ' + event.data);
+            };
+            
+            ws.onerror = function(error) {
+                statusDiv.textContent = 'WebSocket Error ❌';
+                log('WebSocket error: ' + error);
+            };
+            
+            ws.onclose = function() {
+                log('WebSocket connection closed');
+            };
+            
+        } catch (error) {
+            statusDiv.textContent = 'Connection Failed ❌';
+            log('Error: ' + error.message);
+        }
+    </script>
+</body>
+</html>

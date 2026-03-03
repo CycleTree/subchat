@@ -12,6 +12,7 @@ export class GatewayClient {
     resolve: (value: any) => void;
     reject: (error: Error) => void;
   }>();
+  private authenticated = false;
 
   constructor(private gatewayUrl: string) {}
 
@@ -23,27 +24,63 @@ export class GatewayClient {
           url.searchParams.set('token', token);
         }
         
+        console.log('Connecting to:', url.toString());
         this.ws = new WebSocket(url.toString());
         
         this.ws.onopen = () => {
-          console.log('Connected to OpenClaw Gateway');
+          console.log('✅ WebSocket connected');
+          // For now, assume we're authenticated after connection
+          this.authenticated = true;
           resolve();
         };
         
         this.ws.onerror = (error) => {
-          console.error('Gateway connection error:', error);
+          console.error('❌ Gateway connection error:', error);
           reject(new Error('Failed to connect to Gateway'));
         };
         
         this.ws.onmessage = (event) => {
-          this.handleMessage(JSON.parse(event.data));
+          try {
+            const message = JSON.parse(event.data);
+            console.log('📨 Received:', message);
+            
+            // Handle authentication challenge - try RPC style response
+            if (message.type === 'event' && message.event === 'connect.challenge') {
+              console.log('🔐 Received auth challenge, responding with RPC style...');
+              const authResponse = {
+                id: '0',
+                method: 'connect.auth',
+                params: {
+                  nonce: message.payload.nonce,
+                  token: token || ''
+                }
+              };
+              console.log('📤 Sending auth response:', authResponse);
+              this.ws!.send(JSON.stringify(authResponse));
+              return;
+            }
+            
+            // Handle successful authentication
+            if (message.type === 'event' && message.event === 'connect.ready') {
+              console.log('✅ Authentication successful');
+              this.authenticated = true;
+              resolve();
+              return;
+            }
+            
+            this.handleMessage(message);
+          } catch (e) {
+            console.error('Error parsing message:', e);
+          }
         };
         
         this.ws.onclose = () => {
-          console.log('Disconnected from Gateway');
+          console.log('🔌 Disconnected from Gateway');
+          this.authenticated = false;
           this.cleanup();
         };
       } catch (error) {
+        console.error('Connection setup error:', error);
         reject(error);
       }
     });
@@ -85,15 +122,31 @@ export class GatewayClient {
     const id = (++this.requestId).toString();
     const request: GatewayRequest = { id, method, params };
 
+    console.log('📤 Sending:', request);
+
     return new Promise((resolve, reject) => {
       this.pendingRequests.set(id, { resolve, reject });
       this.ws!.send(JSON.stringify(request));
+      
+      // Add timeout
+      setTimeout(() => {
+        if (this.pendingRequests.has(id)) {
+          this.pendingRequests.delete(id);
+          reject(new Error('Request timeout'));
+        }
+      }, 10000);
     });
   }
 
   // API methods
   async listSessions(): Promise<SessionInfo[]> {
-    return this.request('sessions_list');
+    try {
+      const result = await this.request('sessions_list');
+      return result || [];
+    } catch (error) {
+      console.error('Failed to list sessions:', error);
+      return [];
+    }
   }
 
   async getSessionHistory(sessionKey: string): Promise<any> {
