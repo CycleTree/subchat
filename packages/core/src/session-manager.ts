@@ -17,6 +17,11 @@ export class SessionManager {
     this.client.onMessage = (message) => {
       this.handleGatewayMessage(message);
     };
+
+    this.client.onDisconnect = () => {
+      this.state.isConnected = false;
+      this.notifyListeners();
+    };
   }
 
   private handleGatewayMessage(message: any) {
@@ -51,18 +56,47 @@ export class SessionManager {
 
   async connect(gatewayUrl: string, token?: string): Promise<void> {
     try {
+      console.log('🔗 SessionManager: Starting connection...');
       this.state.isLoading = true;
+      this.state.isConnected = false;
       this.notifyListeners();
 
-      await this.client.connect(token);
+      // Connect with retry logic
+      let lastError;
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          console.log(`🔗 Connection attempt ${attempt}/3`);
+          await this.client.connect(token);
+          
+          // Wait a moment for authentication to complete
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          
+          if (this.client.isConnected()) {
+            console.log('✅ Authentication successful');
+            this.state.isConnected = true;
+            this.state.isLoading = false;
+            this.notifyListeners();
+            
+            // Load initial data
+            await this.refreshSessions();
+            return;
+          } else {
+            throw new Error('Authentication failed');
+          }
+        } catch (error) {
+          console.log(`❌ Connection attempt ${attempt} failed:`, error);
+          lastError = error;
+          
+          if (attempt < 3) {
+            console.log('🔄 Retrying in 2 seconds...');
+            await new Promise(resolve => setTimeout(resolve, 2000));
+          }
+        }
+      }
       
-      this.state.isConnected = true;
-      this.state.isLoading = false;
-      this.notifyListeners();
-      
-      // Load initial data
-      await this.refreshSessions();
+      throw lastError || new Error('Failed to connect after 3 attempts');
     } catch (error) {
+      console.error('❌ SessionManager: Connection failed:', error);
       this.state.isLoading = false;
       this.state.isConnected = false;
       this.notifyListeners();
@@ -72,28 +106,33 @@ export class SessionManager {
 
   async refreshSessions(): Promise<void> {
     try {
+      console.log('📋 Refreshing sessions...');
       const sessions = await this.client.listSessions();
+      console.log(`✅ Loaded ${sessions.length} sessions`);
       this.state.sessions = sessions;
       this.notifyListeners();
     } catch (error) {
-      console.error('Failed to refresh sessions:', error);
+      console.error('❌ Failed to refresh sessions:', error);
       throw error;
     }
   }
 
   async selectSession(sessionKey: string): Promise<void> {
     try {
+      console.log(`📂 Selecting session: ${sessionKey}`);
       this.state.currentSessionKey = sessionKey;
       
       // Load history if not already loaded
       if (!this.state.messages[sessionKey]) {
+        console.log(`📜 Loading history for session: ${sessionKey}`);
         const history = await this.client.getSessionHistory(sessionKey);
         this.state.messages[sessionKey] = history.messages || [];
+        console.log(`✅ Loaded ${this.state.messages[sessionKey].length} messages`);
       }
       
       this.notifyListeners();
     } catch (error) {
-      console.error('Failed to select session:', error);
+      console.error('❌ Failed to select session:', error);
       throw error;
     }
   }
@@ -104,9 +143,11 @@ export class SessionManager {
     }
 
     try {
+      console.log(`💬 Sending message to ${this.state.currentSessionKey}:`, message);
       await this.client.sendMessage(this.state.currentSessionKey, message);
+      console.log('✅ Message sent');
     } catch (error) {
-      console.error('Failed to send message:', error);
+      console.error('❌ Failed to send message:', error);
       throw error;
     }
   }
@@ -128,6 +169,7 @@ export class SessionManager {
   }
 
   disconnect() {
+    console.log('🔌 SessionManager: Disconnecting...');
     this.client.disconnect();
     this.state.isConnected = false;
     this.state.currentSessionKey = null;

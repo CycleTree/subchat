@@ -1,44 +1,40 @@
-import React, { useEffect } from 'react';
-import { useChatStore } from './store/chat-store';
+import { useEffect } from 'react';
 import { SessionList } from './components/SessionList';
 import { ChatView } from './components/ChatView';
 import { ConnectionStatus } from './components/ConnectionStatus';
+import { useChatStore } from './store/chat-store';
 
-function App() {
-  const { isConnected, connect } = useChatStore();
+export default function App() {
+  const { connect, isLoading } = useChatStore();
 
   useEffect(() => {
-    // Use correct OpenClaw Gateway port and auth token
+    // Auto-connect on mount
     const gatewayUrl = 'ws://localhost:18792/gateway';
-    const authToken = '3a46fc7cb69ecda092d43712ed997b7c8ffd5b4449a97c2f';
-    connect(gatewayUrl, authToken);
+    const token = '3a46fc7cb69ecda092d43712ed997b7c8ffd5b4449a97c2f';
+    
+    connect(gatewayUrl, token).catch(console.error);
   }, [connect]);
 
-  return (
-    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ borderBottom: '1px solid #ccc', padding: '10px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <h1>subchat</h1>
-          <ConnectionStatus />
-        </div>
+  if (isLoading) {
+    return (
+      <div style={{ padding: '20px', textAlign: 'center' }}>
+        <h2>subchat - OpenClaw サブエージェント会話観測</h2>
+        <ConnectionStatus />
+        <div>Loading...</div>
       </div>
-      
-      <div style={{ flex: 1, display: 'flex' }}>
-        <div style={{ width: '300px', borderRight: '1px solid #ccc', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ padding: '10px', borderBottom: '1px solid #ccc' }}>
-            <h2>Sessions</h2>
-          </div>
-          <div style={{ flex: 1, overflowY: 'auto' }}>
-            <SessionList />
-          </div>
-        </div>
-        
-        <div style={{ flex: 1 }}>
-          <ChatView />
-        </div>
+    );
+  }
+
+  return (
+    <div style={{ display: 'flex', height: '100vh', fontFamily: 'Arial, sans-serif' }}>
+      <div style={{ width: '300px', borderRight: '1px solid #ddd', padding: '10px' }}>
+        <h2 style={{ margin: '0 0 10px 0', fontSize: '16px' }}>subchat</h2>
+        <ConnectionStatus />
+        <SessionList />
+      </div>
+      <div style={{ flex: 1, padding: '10px' }}>
+        <ChatView />
       </div>
     </div>
   );
 }
-
-export default App;
