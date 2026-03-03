@@ -8,47 +8,62 @@
     flake-utils.lib.eachDefaultSystem (system:
       let pkgs = nixpkgs.legacyPackages.${system};
       in {
-        devShells.default = pkgs.mkShell {
-          buildInputs = with pkgs; [
+        devShells.default = (pkgs.buildFHSEnv {
+          name = "subchat-playwright";
+
+          targetPkgs = pkgs: with pkgs; [
             nodejs_22
+            openssl
+            systemd
+            glibc
+            glibc.dev
+            glib
+            cups.lib
+            cups
+            nss
+            nssTools
+            alsa-lib
+            dbus
+            at-spi2-core
+            libdrm
+            expat
+            xorg.libX11
+            xorg.libXcomposite
+            xorg.libXdamage
+            xorg.libXext
+            xorg.libXfixes
+            xorg.libXrandr
+            xorg.libxcb
+            mesa
+            libxkbcommon
+            pango
+            cairo
+            nspr
           ];
-          
-          shellHook = ''
-            export NIX_LD_LIBRARY_PATH=${pkgs.lib.makeLibraryPath [
-              pkgs.glib
-              pkgs.nss
-              pkgs.nspr
-              pkgs.atk
-              pkgs.at-spi2-atk
-              pkgs.libxkbcommon
-              pkgs.libdrm
-              pkgs.xorg.libXcomposite
-              pkgs.xorg.libXdamage
-              pkgs.xorg.libXrandr
-              pkgs.mesa
-              pkgs.gtk3
-              pkgs.pango
-              pkgs.cairo
-              pkgs.gdk-pixbuf
-              pkgs.fontconfig
-              pkgs.freetype
-              pkgs.dbus
-              pkgs.libGL
-              pkgs.libxshmfence
-              pkgs.libuuid
-              pkgs.expat
-            ]}
-            export NIX_LD=$(cat ${pkgs.stdenv.cc}/nix-support/dynamic-linker)
+
+          profile = ''
+            export LD_LIBRARY_PATH=/run/opengl-driver/lib:/run/opengl-driver-32/lib:/lib
+            export FONTCONFIG_FILE=/etc/fonts/fonts.conf
             
-            echo "🎭 NixOS environment ready with library paths"
+            echo "🎭 FHS environment ready for Playwright"
             echo "📋 Node: $(node --version)"
-            echo "🔧 NIX_LD: $NIX_LD"
-            echo "📚 Library paths configured"
+            echo "🔧 LD_LIBRARY_PATH: $LD_LIBRARY_PATH"
+            echo "📚 FHS-compatible /usr/lib available"
             echo ""
             echo "Usage:"
-            echo "  npm run dev     # Start subchat"
-            echo "  node simple_screenshot.js  # Take screenshot with nix-ld"
+            echo "  npm run dev                    # Start subchat"
+            echo "  node simple_screenshot.js     # Take screenshot"
+            echo "  npx playwright install         # Install browsers"
           '';
-        };
-      });
+
+          unshareUser = false;
+          unshareIpc = false;
+          unsharePid = false;
+          unshareNet = false;
+          unshareUts = false;
+          unshareCgroup = false;
+          dieWithParent = true;
+        }).env;
+      }
+    );
 }
