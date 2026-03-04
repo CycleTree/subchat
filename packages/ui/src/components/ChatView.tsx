@@ -1,120 +1,252 @@
-import { useState } from 'react';
-import { useChatStore } from '../store/chat-store';
+// SubChat v2 - Chat View Component
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  Box,
+  Paper,
+  Typography,
+  TextField,
+  IconButton,
+  Chip,
 
-export function ChatView() {
-  const { currentSessionKey, messages, sendMessage, isConnected } = useChatStore();
-  const [newMessage, setNewMessage] = useState('');
+  Stack,
+  CircularProgress
+} from '@mui/material';
+import { Send, Circle } from '@mui/icons-material';
+import type { Session, Message } from '../../../shared/src/types';
 
-  const currentMessages = currentSessionKey ? messages[currentSessionKey] || [] : [];
+interface ChatViewProps {
+  session: Session | null;
+  messages: Message[];
+  onSendMessage: (content: string) => Promise<void>;
+  isConnected: boolean;
+}
 
-  const handleSendMessage = async () => {
-    if (!newMessage.trim() || !currentSessionKey) return;
-    
+export const ChatView: React.FC<ChatViewProps> = ({
+  session,
+  messages,
+  onSendMessage,
+  isConnected
+}) => {
+  const [inputValue, setInputValue] = useState('');
+  const [sending, setSending] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  // Auto scroll to bottom
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const handleSend = async () => {
+    if (!inputValue.trim() || sending || !session) return;
+
+    setSending(true);
     try {
-      await sendMessage(newMessage);
-      setNewMessage('');
+      await onSendMessage(inputValue.trim());
+      setInputValue('');
     } catch (error) {
       console.error('Failed to send message:', error);
+    } finally {
+      setSending(false);
     }
   };
 
-  if (!currentSessionKey) {
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString('en-US', { 
+      hour12: false, 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
+  };
+
+  const getRoleColor = (role: string) => {
+    switch (role) {
+      case 'user': return 'primary';
+      case 'assistant': return 'secondary';
+      case 'system': return 'default';
+      default: return 'default';
+    }
+  };
+
+  const getMessageAlignment = (role: string) => {
+    return role === 'user' ? 'flex-end' : 'flex-start';
+  };
+
+  if (!session) {
     return (
-      <div style={{ 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'center', 
-        height: '100%',
-        color: '#666'
-      }}>
-        Select a session to view conversation
-      </div>
+      <Box 
+        sx={{ 
+          flexGrow: 1, 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center',
+          bgcolor: 'grey.50'
+        }}
+      >
+        <Typography variant="h6" color="text.secondary">
+          Select a session to start chatting
+        </Typography>
+      </Box>
     );
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div style={{ 
-        padding: '10px', 
-        borderBottom: '1px solid #ddd',
-        background: '#f8f9fa'
-      }}>
-        <h3 style={{ margin: 0, fontSize: '14px' }}>
-          Session: {currentSessionKey}
-        </h3>
-      </div>
-      
-      <div style={{ 
-        flex: 1, 
-        overflow: 'auto', 
-        padding: '10px',
-        background: '#fff'
-      }}>
-        {currentMessages.length === 0 ? (
-          <div style={{ color: '#666', fontStyle: 'italic' }}>
-            No messages in this session
-          </div>
-        ) : (
-          currentMessages.map((message, index) => (
-            <div
-              key={message.id || index}
-              style={{
-                padding: '8px',
-                margin: '5px 0',
-                background: message.role === 'user' ? '#e3f2fd' : '#f5f5f5',
-                borderRadius: '8px',
-                borderLeft: `3px solid ${message.role === 'user' ? '#2196F3' : '#4CAF50'}`
-              }}
-            >
-              <div style={{ fontSize: '10px', color: '#666', marginBottom: '2px' }}>
-                {message.role} • {new Date(message.timestamp).toLocaleTimeString()}
-              </div>
-              <div style={{ fontSize: '14px' }}>
-                {message.content}
-              </div>
-            </div>
-          ))
-        )}
-      </div>
-      
-      <div style={{ 
-        padding: '10px', 
-        borderTop: '1px solid #ddd',
-        background: '#f8f9fa'
-      }}>
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <input
-            type="text"
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-            placeholder={isConnected ? "Type a message..." : "Not connected"}
-            disabled={!isConnected}
-            style={{
-              flex: 1,
-              padding: '8px',
-              border: '1px solid #ddd',
-              borderRadius: '4px',
-              fontSize: '14px'
-            }}
+    <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', height: '100vh' }}>
+      {/* Header */}
+      <Paper 
+        elevation={0} 
+        sx={{ 
+          p: 2, 
+          borderBottom: 1, 
+          borderColor: 'divider',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between'
+        }}
+      >
+        <Box>
+          <Typography variant="h6" component="h1" sx={{ fontWeight: 600 }}>
+            {session.name}
+          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+            <Chip label={session.agentId} size="small" color="primary" variant="outlined" />
+            <Typography variant="caption" color="text.secondary">
+              {messages.length} messages
+            </Typography>
+          </Box>
+        </Box>
+        
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Circle 
+            sx={{ 
+              fontSize: 12, 
+              color: isConnected ? 'success.main' : 'error.main' 
+            }} 
           />
-          <button
-            onClick={handleSendMessage}
-            disabled={!isConnected || !newMessage.trim()}
-            style={{
-              padding: '8px 16px',
-              background: isConnected ? '#2196F3' : '#ccc',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: isConnected ? 'pointer' : 'not-allowed',
-              fontSize: '14px'
+          <Typography variant="caption" color="text.secondary">
+            {isConnected ? 'Connected' : 'Disconnected'}
+          </Typography>
+        </Box>
+      </Paper>
+
+      {/* Messages */}
+      <Box 
+        sx={{ 
+          flexGrow: 1, 
+          overflow: 'auto', 
+          p: 2,
+          bgcolor: 'grey.50'
+        }}
+      >
+        {messages.length === 0 ? (
+          <Box 
+            sx={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              height: '100%' 
             }}
           >
-            Send
-          </button>
-        </div>
-      </div>
-    </div>
+            <Typography variant="body2" color="text.secondary">
+              No messages yet. Start a conversation!
+            </Typography>
+          </Box>
+        ) : (
+          <Stack spacing={2}>
+            {messages.map((message) => (
+              <Box
+                key={message.id}
+                sx={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: getMessageAlignment(message.role),
+                }}
+              >
+                <Paper
+                  elevation={1}
+                  sx={{
+                    p: 2,
+                    maxWidth: '70%',
+                    bgcolor: message.role === 'user' ? 'primary.light' : 'background.paper',
+                    color: message.role === 'user' ? 'primary.contrastText' : 'text.primary',
+                  }}
+                >
+                  <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+                    {message.content}
+                  </Typography>
+                  
+                  {/* Message status for pending messages */}
+                  {message.status && (
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
+                      {message.status === 'pending' && (
+                        <CircularProgress size={12} />
+                      )}
+                      <Typography variant="caption" color="text.secondary">
+                        {message.status}
+                      </Typography>
+                    </Box>
+                  )}
+                </Paper>
+                
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+                  <Chip 
+                    label={message.role} 
+                    size="small" 
+                    color={getRoleColor(message.role) as any}
+                    sx={{ fontSize: '0.7rem', height: 18 }}
+                  />
+                  <Typography variant="caption" color="text.secondary">
+                    {formatTime(message.timestamp)}
+                  </Typography>
+                </Box>
+              </Box>
+            ))}
+            <div ref={messagesEndRef} />
+          </Stack>
+        )}
+      </Box>
+
+      {/* Input */}
+      <Box sx={{ p: 2, bgcolor: 'background.paper', borderTop: 1, borderColor: 'divider' }}>
+        <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-end' }}>
+          <TextField
+            fullWidth
+            multiline
+            maxRows={3}
+            variant="outlined"
+            placeholder={isConnected ? "Type a message..." : "Disconnected - cannot send messages"}
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            onKeyPress={handleKeyPress}
+            disabled={!isConnected || sending}
+            size="small"
+          />
+          <IconButton
+            onClick={handleSend}
+            disabled={!inputValue.trim() || !isConnected || sending}
+            color="primary"
+            sx={{ mb: 0.5 }}
+          >
+            {sending ? <CircularProgress size={20} /> : <Send />}
+          </IconButton>
+        </Box>
+        
+        {/* Status bar */}
+        <Box sx={{ mt: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Typography variant="caption" color="text.secondary">
+            {isConnected ? '🟢 Online' : '🔴 Offline'}
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            Press Enter to send • Shift+Enter for new line
+          </Typography>
+        </Box>
+      </Box>
+    </Box>
   );
-}
+};

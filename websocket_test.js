@@ -13,25 +13,24 @@ const { chromium } = require('playwright-core');
     const page = await browser.newPage();
     await page.setViewportSize({ width: 1280, height: 720 });
     
-    // Monitor all console messages
-    const allMessages = [];
+    // Monitor console messages
+    const consoleMessages = [];
     page.on('console', msg => {
-      allMessages.push(`[${msg.type()}] ${msg.text()}`);
+      consoleMessages.push(`[${msg.type()}] ${msg.text()}`);
     });
     
     console.log('📡 Loading subchat...');
-    await page.goto('http://localhost:3001', { 
+    await page.goto('http://localhost:3000', { 
       timeout: 10000,
       waitUntil: 'domcontentloaded'
     });
     
     console.log('⏳ Waiting for WebSocket authentication process...');
-    await page.waitForTimeout(5000);
+    await page.waitForTimeout(8000);
     
     // Check WebSocket status in the browser
     const wsStatus = await page.evaluate(() => {
       return new Promise((resolve) => {
-        // Try to access the WebSocket connection state
         setTimeout(() => {
           const status = {
             wsConnected: window.__SUBCHAT_WS_STATE__ || 'unknown',
@@ -45,9 +44,10 @@ const { chromium } = require('playwright-core');
     
     console.log('🔌 WebSocket Status:', JSON.stringify(wsStatus, null, 2));
     
-    // Show all console messages for authentication debugging
-    console.log('\n📝 Complete console log:');
-    allMessages.forEach((msg, index) => {
+    // Show last 20 console messages for authentication debugging
+    console.log('\n📝 Console messages (last 20):');
+    const recentMessages = consoleMessages.slice(-20);
+    recentMessages.forEach((msg, index) => {
       console.log(`  ${index + 1}: ${msg}`);
     });
     
