@@ -1,52 +1,56 @@
-// SubChat v2.0.1 - Session List Component with New Chat Feature
 import React, { useState } from 'react';
 import {
-  List,
-  ListItemButton,
-  ListItemText,
-  ListItemIcon,
-  Typography,
   Box,
-  Badge,
+  
+  ListItemButton,
+  ListItemIcon,
+  ListItemText,
+  Typography,
   Chip,
+  Badge,
   Stack,
-  Button,
+  Paper,
+  IconButton,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
+  Button,
   TextField,
-  IconButton
+  Alert,
+  CircularProgress
 } from '@mui/material';
-import { Circle, SmartToy, Add, Chat, Settings } from '@mui/icons-material';
-import type { Session } from '../../../shared/src/types';
+import { 
+  Circle as CircleIcon,
+  Add as AddIcon,
+  Send as SendIcon,
+  Settings as SettingsIcon
+} from '@mui/icons-material';
 import { useAppStore } from '../store';
+import type { Session } from '../services/gateway';
 
 interface SessionListProps {
   sessions: Session[];
-  onStartNewConversation?: (message: string) => Promise<void>;
-  onOpenSettings?: () => void;
 }
 
-export const SessionList: React.FC<SessionListProps> = ({ 
-  sessions, 
-  onStartNewConversation,
-  onOpenSettings
-}) => {
+export const SessionList: React.FC<SessionListProps> = ({ sessions }) => {
   const { currentSessionId, setCurrentSession } = useAppStore();
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [newChatMessage, setNewChatMessage] = useState('');
-  const [starting, setStarting] = useState(false);
+  const [newChatOpen, setNewChatOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [newMessage, setNewMessage] = useState('');
+  const [isStarting, setIsStarting] = useState(false);
 
-  const formatTime = (date: Date) => {
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
+  const formatTimeAgo = (date: Date): string => {
+    const now = new Date().getTime();
+    const diff = now - date.getTime();
     const minutes = Math.floor(diff / (1000 * 60));
     
     if (minutes < 1) return 'now';
     if (minutes < 60) return `${minutes}m`;
+    
     const hours = Math.floor(minutes / 60);
     if (hours < 24) return `${hours}h`;
+    
     const days = Math.floor(hours / 24);
     return `${days}d`;
   };
@@ -57,18 +61,22 @@ export const SessionList: React.FC<SessionListProps> = ({
   };
 
   const handleStartNewChat = async () => {
-    if (!newChatMessage.trim() || !onStartNewConversation || starting) return;
-
-    setStarting(true);
+    if (!newMessage.trim() || isStarting) return;
+    
+    setIsStarting(true);
     try {
-      await onStartNewConversation(newChatMessage.trim());
-      setNewChatMessage('');
-      setDialogOpen(false);
+      setNewMessage('');
+      setNewChatOpen(false);
+      alert('To start a new conversation, please use the OpenClaw CLI:\n\nopenclaw agent --message "Your message here" --agent fixus');
     } catch (error) {
-      console.error('Failed to start new conversation:', error);
+      console.error('❌ Failed to start new chat:', error);
     } finally {
-      setStarting(false);
+      setIsStarting(false);
     }
+  };
+
+  const handleSettingsClick = () => {
+    setSettingsOpen(true);
   };
 
   return (
@@ -80,18 +88,14 @@ export const SessionList: React.FC<SessionListProps> = ({
             SubChat v2.0.1
           </Typography>
           <Stack direction="row" spacing={1}>
-            <IconButton
-              size="small"
-              onClick={() => onOpenSettings?.()}
-              title="Settings"
-            >
-              <Settings fontSize="small" />
+            <IconButton size="small" onClick={handleSettingsClick} title="Settings">
+              <SettingsIcon fontSize="small" />
             </IconButton>
             <Button
               variant="contained"
               size="small"
-              startIcon={<Add />}
-              onClick={() => setDialogOpen(true)}
+              startIcon={<AddIcon />}
+              onClick={() => setNewChatOpen(true)}
               sx={{ minWidth: 'auto', px: 2 }}
             >
               New
@@ -103,25 +107,25 @@ export const SessionList: React.FC<SessionListProps> = ({
         </Typography>
       </Box>
 
-      {/* Session List */}
-      <List sx={{ flexGrow: 1, overflow: 'auto', p: 0 }}>
+      {/* Sessions List */}
+      <Box sx={{ flexGrow: 1, overflow: 'auto', p: 0 }}>
         {sessions.length === 0 ? (
           <Box sx={{ p: 3, textAlign: 'center' }}>
-            <Chat sx={{ fontSize: 48, color: 'grey.400', mb: 2 }} />
+            <CircleIcon sx={{ fontSize: 48, color: 'grey.400', mb: 2 }} />
             <Typography variant="body2" color="text.secondary" mb={2}>
               No active sessions
             </Typography>
             <Button
               variant="outlined"
-              startIcon={<Add />}
-              onClick={() => setDialogOpen(true)}
+              startIcon={<AddIcon />}
+              onClick={() => setNewChatOpen(true)}
               size="small"
             >
               Start New Chat
             </Button>
           </Box>
         ) : (
-          sessions.map((session) => (
+          sessions.map(session => (
             <ListItemButton
               key={session.id}
               selected={session.id === currentSessionId}
@@ -136,13 +140,13 @@ export const SessionList: React.FC<SessionListProps> = ({
                   borderRight: 3,
                   borderRightColor: 'primary.main',
                   '&:hover': {
-                    backgroundColor: 'primary.light',
-                  },
-                },
+                    backgroundColor: 'primary.light'
+                  }
+                }
               }}
             >
               <ListItemIcon sx={{ minWidth: 40 }}>
-                <SmartToy 
+                <CircleIcon 
                   color={session.isActive ? 'primary' : 'disabled'} 
                   fontSize="small" 
                 />
@@ -151,31 +155,42 @@ export const SessionList: React.FC<SessionListProps> = ({
               <ListItemText
                 primary={
                   <Stack direction="row" alignItems="center" spacing={1}>
-                    <Typography variant="body2" component="span" noWrap sx={{ fontWeight: 500 }}>
+                    <Typography 
+                      variant="body2" 
+                      component="span" 
+                      noWrap 
+                      sx={{ fontWeight: 500 }}
+                    >
                       {session.name}
                     </Typography>
                     {session.isActive && (
-                      <Circle sx={{ fontSize: 8, color: 'success.main' }} />
+                      <CircleIcon sx={{ fontSize: 8, color: 'success.main' }} />
                     )}
                   </Stack>
                 }
                 secondary={
-                  <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1} sx={{ mt: 0.5 }}>
-                    <Chip
-                      label={session.agentId}
-                      size="small"
-                      variant="outlined"
-                      sx={{ fontSize: '0.7rem', height: 20 }}
+                  <Stack 
+                    direction="row" 
+                    alignItems="center" 
+                    justifyContent="space-between" 
+                    spacing={1} 
+                    sx={{ mt: 0.5 }}
+                  >
+                    <Chip 
+                      label={session.agentId} 
+                      size="small" 
+                      variant="outlined" 
+                      sx={{ fontSize: '0.7rem', height: 20 }} 
                     />
                     <Typography variant="caption" color="text.secondary">
-                      {formatTime(session.lastActivity)}
+                      {formatTimeAgo(session.lastActivity)}
                     </Typography>
                   </Stack>
                 }
               />
               
               {session.messageCount > 0 && (
-                <Badge
+                <Badge 
                   badgeContent={session.messageCount > 99 ? '99+' : session.messageCount}
                   color="primary"
                   sx={{ ml: 1 }}
@@ -186,7 +201,7 @@ export const SessionList: React.FC<SessionListProps> = ({
             </ListItemButton>
           ))
         )}
-      </List>
+      </Box>
 
       {/* Footer */}
       <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
@@ -196,7 +211,7 @@ export const SessionList: React.FC<SessionListProps> = ({
       </Box>
 
       {/* New Chat Dialog */}
-      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="sm" fullWidth>
+      <Dialog open={newChatOpen} onClose={() => setNewChatOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>Start New Conversation</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary" mb={2}>
@@ -209,22 +224,79 @@ export const SessionList: React.FC<SessionListProps> = ({
             rows={3}
             variant="outlined"
             placeholder="Hello! I'd like to..."
-            value={newChatMessage}
-            onChange={(e) => setNewChatMessage(e.target.value)}
-            disabled={starting}
+            value={newMessage}
+            onChange={(e) => setNewMessage(e.target.value)}
+            disabled={isStarting}
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDialogOpen(false)} disabled={starting}>
+          <Button onClick={() => setNewChatOpen(false)} disabled={isStarting}>
             Cancel
           </Button>
-          <Button 
+          <Button
             variant="contained"
-            onClick={handleStartNewChat} 
-            disabled={!newChatMessage.trim() || starting}
-            startIcon={starting ? undefined : <Chat />}
+            onClick={handleStartNewChat}
+            disabled={!newMessage.trim() || isStarting}
+            startIcon={isStarting ? <CircularProgress size={16} /> : <SendIcon />}
           >
-            {starting ? 'Starting...' : 'Start Chat'}
+            {isStarting ? 'Starting...' : 'Start Chat'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Settings Dialog */}
+      <Dialog open={settingsOpen} onClose={() => setSettingsOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle>
+          <Stack direction="row" alignItems="center" spacing={1}>
+            <SettingsIcon />
+            <Typography variant="h6">Settings</Typography>
+          </Stack>
+        </DialogTitle>
+        <DialogContent>
+          <Stack spacing={3}>
+            <Alert severity="info">
+              <Typography variant="body2">
+                SubChat connects to OpenClaw Gateway to view conversations between agents and subagents. 
+                API keys and model configuration should be managed via the OpenClaw CLI.
+              </Typography>
+            </Alert>
+            
+            <Box>
+              <Typography variant="subtitle1" fontWeight={600} mb={1}>
+                OpenClaw CLI Configuration
+              </Typography>
+              <Typography variant="body2" color="text.secondary" mb={2}>
+                To configure API keys and models, use these commands:
+              </Typography>
+              <Paper sx={{ p: 2, bgcolor: 'grey.100' }}>
+                <Typography variant="body2" component="pre" sx={{ fontFamily: 'monospace', margin: 0 }}>
+{`# Configure Anthropic Claude
+openclaw models auth paste-token --provider anthropic
+
+# Check model status  
+openclaw models status
+
+# Set default model
+openclaw models set anthropic/claude-sonnet-4-5`}
+                </Typography>
+              </Paper>
+            </Box>
+
+            <Box>
+              <Typography variant="subtitle1" fontWeight={600} mb={1}>
+                About SubChat v2.0.1
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                SubChat provides real-time visibility into OpenClaw agent conversations, 
+                subagent spawning, and task delegation. For full functionality, ensure 
+                your OpenClaw Gateway is properly configured with model providers.
+              </Typography>
+            </Box>
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setSettingsOpen(false)}>
+            Close
           </Button>
         </DialogActions>
       </Dialog>

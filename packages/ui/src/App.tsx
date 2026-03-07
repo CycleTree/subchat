@@ -1,274 +1,168 @@
-// SubChat v2 - Main Application (Environment-aware)
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
-import { CssBaseline, Box, Alert, CircularProgress } from '@mui/material';
-import { SessionList } from './components/SessionList';
-import { SettingsDialog } from './components/SettingsDialog';
-import { ChatView } from './components/ChatView';
-import { GatewayService } from './services/gateway';
+import { CssBaseline, Alert, Box } from '@mui/material';
 import { useAppStore } from './store';
-import type { Message } from '../../shared/src/types';
+import { OpenClawGateway } from './services/gateway';
+import { SessionList } from './components/SessionList';
+import { ChatView } from './components/ChatView';
 
-// Material-UI Theme
 const theme = createTheme({
   palette: {
-    mode: 'light',
-    primary: {
-      main: '#1976d2',
-    },
-    secondary: {
-      main: '#dc004e',
-    },
-    background: {
-      default: '#fafafa',
-    },
+    primary: { main: '#2563eb', light: '#eff6ff' },
+    background: { default: '#f8fafc' }
   },
   typography: {
-    fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-  },
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+  }
 });
 
-// Environment-aware Gateway Configuration
-const getGatewayConfig = () => {
-  const isDev = import.meta.env.DEV;
-  const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-  
-  if (isDev || isLocalhost) {
-    // Development: Local OpenClaw Gateway
-    return {
-      url: 'ws://localhost:18792/gateway',
-      token: '3a46fc7cb69ecda092d43712ed997b7c8ffd5b4449a97c2f'
-    };
-  } else {
-    // Production: Fly.io OpenClaw Gateway
-    return {
-      url: 'wss://subchat-openclaw-gateway.fly.dev/gateway',  // Will be updated with actual Fly.io URL
-      token: import.meta.env.VITE_OPENCLAW_TOKEN || 'subchat-gateway-token-2026'
-    };
-  }
-};
+const gateway = new OpenClawGateway();
 
-export default function App() {
+function App() {
   const {
     sessions,
-    setSessions,
-    currentSessionId,
-    getCurrentMessages,
-    getCurrentSession,
-    addMessage,
-    updateMessage,
+    currentSessionId, 
     connection,
+    setSessions,
+    addMessage,
     setConnection,
-    setCurrentSession,
+    getCurrentMessages
   } = useAppStore();
 
-  const [gateway] = useState(() => new GatewayService());
   const [initError, setInitError] = useState<string | null>(null);
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [gatewayConfig] = useState(getGatewayConfig);
 
-  // Initialize Gateway Connection
   useEffect(() => {
-    const init = async () => {
+    const initializeGateway = async () => {
+      setConnection({ isConnected: false, isConnecting: true });
+
+      gateway.onConnectionChange = (isConnected: boolean) => {
+        setConnection({ isConnected, isConnecting: false });
+      };
+
       try {
-        // Reset error state at start
-        setInitError(null);
-        setConnection({ isConnected: false, isConnecting: true });
-        console.log('🚀 SubChat v2 - Initializing...');
-        console.log('🔗 Gateway URL:', gatewayConfig.url);
+        const isDevelopment = window.location.hostname === 'localhost';
+        const gatewayUrl = isDevelopment 
+          ? 'ws://localhost:18792/gateway'
+          : 'wss://subchat-openclaw-gateway.fly.dev/gateway';
+        
+        const authToken = isDevelopment
+          ? 'test-token-123'  
+          : 'subchat-gateway-token-2026';
 
-        // Setup gateway event handlers
-        gateway.onConnectionChange = (connected: boolean) => {
-          console.log('🔗 Connection change:', connected);
-          setConnection({ 
-            isConnected: connected, 
-            isConnecting: false 
-          });
-          
-          // Clear error when successfully connected
-          if (connected) {
-            setInitError(null);
-          }
-        };
+        console.log('🌐 Environment:', isDevelopment ? 'Development' : 'Production');
+        console.log('🔗 Gateway URL:', gatewayUrl);
 
-        // Connect to gateway
-        await gateway.connect(gatewayConfig.url, gatewayConfig.token);
-        console.log('✅ Gateway connected successfully');
+        await gateway.connect(gatewayUrl, authToken);
+        console.log('✅ Gateway connected');
 
-        // Load initial sessions
         const initialSessions = await gateway.getSessions();
-        console.log('📋 Loaded sessions:', initialSessions.length);
         setSessions(initialSessions);
-
-        // Clear error on successful initialization
-        setInitError(null);
+        console.log('📋 Initial sessions loaded:', initialSessions.length);
 
       } catch (error) {
-        console.error('❌ Initialization failed:', error);
-        const errorMessage = error instanceof Error ? error.message : 'Failed to connect to OpenClaw Gateway';
-        setInitError(errorMessage);
-        setConnection({ 
-          isConnected: false, 
-          isConnecting: false, 
-          error: errorMessage 
-        });
+        console.error('❌ Gateway initialization failed:', error);
+        setInitError(`Connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        setConnection({ isConnected: false, isConnecting: false });
       }
     };
 
-    init();
+    initializeGateway();
 
-    // Cleanup
     return () => {
       gateway.disconnect();
     };
-  }, [gateway, setSessions, setConnection, gatewayConfig]);
+  }, [setConnection, setSessions]);
 
-  // Load messages when session changes
   useEffect(() => {
-    if (currentSessionId && connection.isConnected) {
-      const loadMessages = async () => {
-        try {
-          console.log('📨 Loading messages for session:', currentSessionId);
-          const sessionMessages = await gateway.getMessages(currentSessionId);
-          console.log('✅ Loaded messages:', sessionMessages.length);
-          
-          // Clear existing messages for this session and add new ones
-          sessionMessages.forEach(message => addMessage(message));
-        } catch (error) {
-          console.error('❌ Failed to load messages:', error);
-        }
-      };
-      
-      loadMessages();
-    }
-  }, [currentSessionId, connection.isConnected, gateway, addMessage]);
+    const loadMessages = async () => {
+      if (!currentSessionId || !connection.isConnected) return;
 
-  // Send message handler
-  // API key configuration (CLI-based setup)
-  const handleSaveApiKey = async (provider: string, apiKey: string): Promise<void> => {
-    console.log("Note: API key ignored. Use CLI:", apiKey);
-    throw new Error("API keys should be configured via OpenClaw CLI: openclaw models auth paste-token --provider " + provider);
-  };
+      try {
+        const sessionMessages = await gateway.getMessages(currentSessionId);
+        console.log(`📬 Loaded ${sessionMessages.length} messages for session:`, currentSessionId);
+        
+        sessionMessages.forEach(message => {
+          addMessage({
+            ...message,
+            status: 'sent' as const
+          });
+        });
+      } catch (error) {
+        console.error('❌ Failed to load messages:', error);
+      }
+    };
 
-  // Start new conversation handler
-  const handleStartNewConversation = async (message: string): Promise<void> => {
-    if (!connection.isConnected) {
-      throw new Error("Not connected to gateway");
-    }
-
-    console.log("💬 Starting new conversation:", message);
-
-    try {
-      const sessionId = await gateway.startNewConversation(message);
-      console.log("✅ New session created:", sessionId);
-
-      const updatedSessions = await gateway.getSessions();
-      setSessions(updatedSessions);
-      console.log("📋 Sessions refreshed after new chat");
-
-      setCurrentSession(sessionId);
-      console.log("🎯 Selected new session:", sessionId);
-
-    } catch (error) {
-      console.error("❌ Failed to start new conversation:", error);
-      throw error;
-    }
-  };
+    loadMessages();
+  }, [currentSessionId, connection.isConnected, addMessage]);
 
   const handleSendMessage = async (content: string): Promise<void> => {
     if (!currentSessionId || !connection.isConnected) {
       throw new Error('Not connected or no session selected');
     }
 
-    console.log('📤 Sending message:', content);
-
-    // Create optimistic message
-    const optimisticMessage: Message = {
-      id: `pending-${Date.now()}`,
-      sessionId: currentSessionId,
-      role: 'user',
-      content,
-      timestamp: new Date(),
-      status: 'pending'
-    };
-
-    // Add optimistic message
-    addMessage(optimisticMessage);
-
     try {
-      // Send to gateway
       await gateway.sendMessage(currentSessionId, content);
       
-      // Update message status
-      updateMessage(optimisticMessage.id, { status: 'sent' });
-      console.log('✅ Message sent successfully');
+      addMessage({
+        id: `temp-${Date.now()}`,
+        sessionId: currentSessionId,
+        role: 'user',
+        content,
+        timestamp: new Date(),
+        status: 'sent'
+      });
+
+      console.log('✅ Message sent:', content);
+      
+      setTimeout(async () => {
+        try {
+          await gateway.getMessages(currentSessionId);
+          console.log('🔄 Messages refreshed');
+        } catch (error) {
+          console.error('❌ Failed to refresh messages:', error);
+        }
+      }, 2000);
 
     } catch (error) {
       console.error('❌ Failed to send message:', error);
-      updateMessage(optimisticMessage.id, { status: 'failed' });
       throw error;
     }
   };
 
-  // Loading state
-  if (connection.isConnecting && !initError) {
-    return (
-      <Box 
-        sx={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'center', 
-          height: '100vh',
-          flexDirection: 'column',
-          gap: 2
-        }}
-      >
-        <CircularProgress />
-        <Box sx={{ textAlign: 'center' }}>
-          Connecting to OpenClaw Gateway...
-          <br />
-          <small style={{ color: '#666' }}>{gatewayConfig.url}</small>
-        </Box>
-      </Box>
-    );
-  }
-
-  // Error state - only show if currently not connected AND have error
-  if (initError && !connection.isConnected) {
-    return (
-      <Box sx={{ p: 3 }}>
-        <Alert severity="error" variant="filled">
-          <strong>Connection Failed</strong><br />
-          {initError}
-          <br />
-          <small>Gateway: {gatewayConfig.url}</small>
-        </Alert>
-      </Box>
-    );
-  }
+  const currentSession = sessions.find(s => s.id === currentSessionId) || null;
+  const currentMessages = getCurrentMessages();
 
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
-        {/* Session List Sidebar */}
-        <SessionList sessions={sessions} onStartNewConversation={handleStartNewConversation} onOpenSettings={() => setSettingsOpen(true)} />
+        {initError && (
+          <Alert 
+            severity="error" 
+            sx={{ 
+              position: 'absolute', 
+              top: 16, 
+              left: '50%', 
+              transform: 'translateX(-50%)',
+              zIndex: 1000,
+              maxWidth: '80vw'
+            }}
+          >
+            {initError}
+          </Alert>
+        )}
         
-        {/* Main Chat Area */}
-        <ChatView
-          session={getCurrentSession()}
-          messages={getCurrentMessages()}
+        <SessionList sessions={sessions} />
+        
+        <ChatView 
+          session={currentSession}
+          messages={currentMessages}
           onSendMessage={handleSendMessage}
           isConnected={connection.isConnected}
         />
       </Box>
-
-        {/* Settings Dialog */}
-        <SettingsDialog
-          open={settingsOpen}
-          onClose={() => setSettingsOpen(false)}
-          onSaveApiKey={handleSaveApiKey}
-        />
     </ThemeProvider>
   );
 }
+
+export default App;
