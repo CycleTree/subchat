@@ -202,6 +202,35 @@ export class GatewayService {
   }
 
 
+  async configureApiKey(provider: string, apiKey: string): Promise<void> {
+    console.log(`🔑 Configuring ${provider} API key`);
+    
+    const envVarMap: Record<string, string> = {
+      anthropic: "ANTHROPIC_API_KEY",
+      openai: "OPENAI_API_KEY", 
+      gemini: "GEMINI_API_KEY"
+    };
+    
+    const envVar = envVarMap[provider];
+    if (!envVar) {
+      throw new Error(`Unsupported provider: ${provider}`);
+    }
+    
+    try {
+      const result = await this.request("config.set", {
+        raw: {
+          env: {
+            [envVar]: apiKey
+          }
+        }
+      });
+      console.log(`✅ ${provider} API key configured:`, result);
+    } catch (error) {
+      console.error(`❌ Failed to configure ${provider} API key:`, error);
+      throw new Error(`Failed to configure ${provider}: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  }
+
   async spawnSession(task: string, agentId?: string): Promise<string> {
     console.log("🚀 Spawning new session with task:", task);
     
@@ -215,60 +244,17 @@ export class GatewayService {
     });
     
     console.log("✅ Session spawned:", result);
-    
-    // Return the session key/ID
     return result.sessionKey || result.id || result.key;
   }
 
   async startNewConversation(initialMessage: string): Promise<string> {
     console.log("💬 Starting new conversation with:", initialMessage);
     
-    // Spawn a new session with the initial message as the task
     const sessionId = await this.spawnSession(`User wants to chat: ${initialMessage}`);
-    
-    // Send the initial message to the new session
     await this.sendMessage(sessionId, initialMessage);
     
     console.log("✅ New conversation started:", sessionId);
     return sessionId;
-  }
-
-  async configureApiKey(provider: string, apiKey: string): Promise<void> {
-    console.log(`🔑 Configuring ${provider} API key`);
-    
-    // Different environment variable names for each provider
-    const envVarMap: Record<string, string> = {
-      anthropic: "ANTHROPIC_API_KEY",
-      openai: "OPENAI_API_KEY", 
-      gemini: "GEMINI_API_KEY"
-    };
-    
-    const envVar = envVarMap[provider];
-    if (!envVar) {
-      throw new Error(`Unsupported provider: ${provider}`);
-    }
-    
-    // Use OpenClaw config.set method to configure API key
-    const result = await this.request("config.set", {
-      key: `env.${envVar}`,
-      value: apiKey
-    });
-    
-    console.log(`✅ ${provider} API key configured:`, result);
-  }
-
-  async testApiKey(provider: string): Promise<boolean> {
-    console.log(`🧪 Testing ${provider} API key`);
-    
-    try {
-      // Simple test by checking model status or making a small request
-      const result = await this.request("models.list", {});
-      console.log(`✅ ${provider} API key test passed:`, result);
-      return true;
-    } catch (error) {
-      console.error(`❌ ${provider} API key test failed:`, error);
-      return false;
-    }
   }
   disconnect() {
     this.ws?.close();
