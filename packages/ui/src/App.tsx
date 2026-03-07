@@ -3,8 +3,8 @@ import { useEffect, useState } from 'react';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { CssBaseline, Box, Alert, CircularProgress } from '@mui/material';
 import { SessionList } from './components/SessionList';
-import { ChatView } from './components/ChatView';
 import { SettingsDialog } from './components/SettingsDialog';
+import { ChatView } from './components/ChatView';
 import { GatewayService } from './services/gateway';
 import { useAppStore } from './store';
 import type { Message } from '../../shared/src/types';
@@ -144,6 +144,37 @@ export default function App() {
   }, [currentSessionId, connection.isConnected, gateway, addMessage]);
 
   // Send message handler
+  // API key configuration (CLI-based setup)
+  const handleSaveApiKey = async (provider: string, apiKey: string): Promise<void> => {
+    console.log("Note: API key ignored. Use CLI:", apiKey);
+    throw new Error("API keys should be configured via OpenClaw CLI: openclaw models auth paste-token --provider " + provider);
+  };
+
+  // Start new conversation handler
+  const handleStartNewConversation = async (message: string): Promise<void> => {
+    if (!connection.isConnected) {
+      throw new Error("Not connected to gateway");
+    }
+
+    console.log("💬 Starting new conversation:", message);
+
+    try {
+      const sessionId = await gateway.startNewConversation(message);
+      console.log("✅ New session created:", sessionId);
+
+      const updatedSessions = await gateway.getSessions();
+      setSessions(updatedSessions);
+      console.log("📋 Sessions refreshed after new chat");
+
+      setCurrentSession(sessionId);
+      console.log("🎯 Selected new session:", sessionId);
+
+    } catch (error) {
+      console.error("❌ Failed to start new conversation:", error);
+      throw error;
+    }
+  };
+
   const handleSendMessage = async (content: string): Promise<void> => {
     if (!currentSessionId || !connection.isConnected) {
       throw new Error('Not connected or no session selected');
@@ -179,48 +210,6 @@ export default function App() {
     }
   };
 
-  // API key configuration handler
-  const handleSaveApiKey = async (provider: string, apiKey: string): Promise<void> => {
-    if (!connection.isConnected) {
-      throw new Error("Not connected to gateway");
-    }
-
-    console.log(`🔑 Configuring ${provider} API key`);
-
-    try {
-      await gateway.configureApiKey(provider, apiKey);
-      console.log(`✅ ${provider} API key configured successfully`);
-    } catch (error) {
-      console.error(`❌ Failed to configure ${provider} API key:`, error);
-      throw error;
-    }
-  };
-
-  // Start new conversation handler
-  const handleStartNewConversation = async (message: string): Promise<void> => {
-    if (!connection.isConnected) {
-      throw new Error("Not connected to gateway");
-    }
-
-    console.log("💬 Starting new conversation:", message);
-
-    try {
-      const sessionId = await gateway.startNewConversation(message);
-      console.log("✅ New session created:", sessionId);
-
-      const updatedSessions = await gateway.getSessions();
-      setSessions(updatedSessions);
-      console.log("📋 Sessions refreshed after new chat");
-
-      setCurrentSession(sessionId);
-      console.log("🎯 Selected new session:", sessionId);
-
-    } catch (error) {
-      console.error("❌ Failed to start new conversation:", error);
-      throw error;
-    }
-  };
-
   // Loading state
   if (connection.isConnecting && !initError) {
     return (
@@ -240,9 +229,7 @@ export default function App() {
           <br />
           <small style={{ color: '#666' }}>{gatewayConfig.url}</small>
         </Box>
-
       </Box>
-
     );
   }
 
@@ -257,7 +244,6 @@ export default function App() {
           <small>Gateway: {gatewayConfig.url}</small>
         </Alert>
       </Box>
-
     );
   }
 
@@ -276,7 +262,6 @@ export default function App() {
           isConnected={connection.isConnected}
         />
       </Box>
-
 
         {/* Settings Dialog */}
         <SettingsDialog

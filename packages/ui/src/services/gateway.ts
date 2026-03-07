@@ -202,53 +202,6 @@ export class GatewayService {
   }
 
 
-  async configureApiKey(provider: string, apiKey: string): Promise<void> {
-    console.log(`🔑 Configuring ${provider} API key with OpenClaw models.auth API`);
-    
-    try {
-      // Use OpenClaw models.auth.paste-token API (correct method from docs)
-      const result = await this.request("models.auth.paste-token", {
-        provider: provider,
-        token: apiKey
-      });
-      
-      console.log(`✅ ${provider} API key configured successfully:`, result);
-      
-      // Verify configuration with models.status
-      const status = await this.request("models.status");
-      console.log(`📊 Model status after configuration:`, status);
-      
-    } catch (error) {
-      console.error(`❌ Failed to configure ${provider} API key:`, error);
-      
-      // Try alternative method: models.auth.setup-token
-      try {
-        console.log(`🔄 Trying alternative models.auth.setup-token method...`);
-        const altResult = await this.request("models.auth.setup-token", {
-          provider: provider,
-          token: apiKey
-        });
-        console.log(`✅ ${provider} API key configured with setup-token:`, altResult);
-      } catch (altError) {
-        console.error(`❌ Alternative method also failed:`, altError);
-        throw new Error(`Failed to configure ${provider}: ${altError instanceof Error ? altError.message : "Unknown error"}`);
-      }
-    }
-  }
-
-  async checkModelStatus(): Promise<any> {
-    console.log("📊 Checking OpenClaw model status...");
-    
-    try {
-      const status = await this.request("models.status");
-      console.log("✅ Model status retrieved:", status);
-      return status;
-    } catch (error) {
-      console.error("❌ Failed to get model status:", error);
-      throw error;
-    }
-  }
-
   async spawnSession(task: string, agentId?: string): Promise<string> {
     console.log("🚀 Spawning new session with task:", task);
     
@@ -256,7 +209,7 @@ export class GatewayService {
       task: task,
       runtime: "subagent",
       mode: "session",
-      agentId: agentId || "main",
+      agentId: agentId || "fixus",
       label: `SubChat-${Date.now()}`,
       thinking: "low"
     });
