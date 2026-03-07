@@ -83,7 +83,7 @@ export const SessionList: React.FC<SessionListProps> = ({ sessions, onOpenSettin
       <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
         <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1}>
           <Typography variant="h6" component="h1" sx={{ fontWeight: 600 }}>
-            SubChat v2.0.1
+            SubChat v2.1.0
           </Typography>
           <Stack direction="row" spacing={1}>
             <IconButton size="small" onClick={onOpenSettings} title="Settings">
@@ -282,7 +282,7 @@ openclaw models set anthropic/claude-sonnet-4-5`}
 
             <Box>
               <Typography variant="subtitle1" fontWeight={600} mb={1}>
-                About SubChat v2.0.1
+                About SubChat v2.1.0
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 SubChat provides real-time visibility into OpenClaw agent conversations, 

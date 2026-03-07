@@ -280,7 +280,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
 
           <Box>
             <Typography variant="subtitle1" fontWeight={600} mb={1}>
-              About SubChat v2.0.1
+              About SubChat v2.1.0
             </Typography>
             <Typography variant="body2" color="text.secondary">
               SubChat provides real-time visibility into OpenClaw agent conversations and enables API key configuration via the Gateway WebSocket API.
