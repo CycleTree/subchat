@@ -5,6 +5,7 @@ import { useAppStore } from './store';
 import { OpenClawGateway } from './services/gateway';
 import { SessionList } from './components/SessionList';
 import { ChatView } from './components/ChatView';
+import { SettingsDialog } from './components/SettingsDialog';
 
 const theme = createTheme({
   palette: {
@@ -30,6 +31,7 @@ function App() {
   } = useAppStore();
 
   const [initError, setInitError] = useState<string | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => {
     const initializeGateway = async () => {
@@ -95,6 +97,20 @@ function App() {
     loadMessages();
   }, [currentSessionId, connection.isConnected, addMessage]);
 
+  const handleSaveApiKey = async (provider: string, apiKey: string): Promise<void> => {
+    if (!connection.isConnected) {
+      throw new Error('Not connected to gateway');
+    }
+
+    try {
+      await gateway.configureApiKey(provider, apiKey);
+      console.log(`✅ ${provider} API key configured successfully`);
+    } catch (error) {
+      console.error(`❌ Failed to configure ${provider} API key:`, error);
+      throw error;
+    }
+  };
+
   const handleSendMessage = async (content: string): Promise<void> => {
     if (!currentSessionId || !connection.isConnected) {
       throw new Error('Not connected or no session selected');
@@ -152,13 +168,22 @@ function App() {
           </Alert>
         )}
         
-        <SessionList sessions={sessions} />
+        <SessionList 
+          sessions={sessions} 
+          onOpenSettings={() => setSettingsOpen(true)}
+        />
         
         <ChatView 
           session={currentSession}
           messages={currentMessages}
           onSendMessage={handleSendMessage}
           isConnected={connection.isConnected}
+        />
+
+        <SettingsDialog
+          open={settingsOpen}
+          onClose={() => setSettingsOpen(false)}
+          onSaveApiKey={handleSaveApiKey}
         />
       </Box>
     </ThemeProvider>

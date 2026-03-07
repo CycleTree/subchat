@@ -31,9 +31,10 @@ import type { Session } from '../services/gateway';
 
 interface SessionListProps {
   sessions: Session[];
+  onOpenSettings: () => void;
 }
 
-export const SessionList: React.FC<SessionListProps> = ({ sessions }) => {
+export const SessionList: React.FC<SessionListProps> = ({ sessions, onOpenSettings }) => {
   const { currentSessionId, setCurrentSession } = useAppStore();
   const [newChatOpen, setNewChatOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -75,9 +76,6 @@ export const SessionList: React.FC<SessionListProps> = ({ sessions }) => {
     }
   };
 
-  const handleSettingsClick = () => {
-    setSettingsOpen(true);
-  };
 
   return (
     <Box sx={{ width: 320, height: '100vh', borderRight: 1, borderColor: 'divider' }}>
@@ -88,7 +86,7 @@ export const SessionList: React.FC<SessionListProps> = ({ sessions }) => {
             SubChat v2.0.1
           </Typography>
           <Stack direction="row" spacing={1}>
-            <IconButton size="small" onClick={handleSettingsClick} title="Settings">
+            <IconButton size="small" onClick={onOpenSettings} title="Settings">
               <SettingsIcon fontSize="small" />
             </IconButton>
             <Button

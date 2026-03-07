@@ -1,21 +1,28 @@
-// SubChat v2 - Settings Dialog for API Keys
 import React, { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
-  TextField,
   Button,
-  Box,
+  TextField,
   Typography,
-  Alert,
-  Chip,
   Stack,
+  Box,
+  Chip,
+  Alert,
+  InputAdornment,
   IconButton,
-  InputAdornment
+  CircularProgress,
+  Paper
 } from '@mui/material';
-import { Settings, Visibility, VisibilityOff, Save, Delete } from '@mui/icons-material';
+import {
+  Settings as SettingsIcon,
+  Visibility as VisibilityIcon,
+  VisibilityOff as VisibilityOffIcon,
+  Save as SaveIcon,
+  Delete as DeleteIcon
+} from '@mui/icons-material';
 
 interface SettingsDialogProps {
   open: boolean;
@@ -23,15 +30,7 @@ interface SettingsDialogProps {
   onSaveApiKey: (provider: string, apiKey: string) => Promise<void>;
 }
 
-interface ApiKeyConfig {
-  provider: string;
-  label: string;
-  placeholder: string;
-  pattern: string;
-  description: string;
-}
-
-const API_CONFIGS: ApiKeyConfig[] = [
+const API_PROVIDERS = [
   {
     provider: 'anthropic',
     label: 'Anthropic Claude',
@@ -55,28 +54,30 @@ const API_CONFIGS: ApiKeyConfig[] = [
   }
 ];
 
-export const SettingsDialog: React.FC<SettingsDialogProps> = ({
-  open,
-  onClose,
-  onSaveApiKey
+export const SettingsDialog: React.FC<SettingsDialogProps> = ({ 
+  open, 
+  onClose, 
+  onSaveApiKey 
 }) => {
   const [apiKeys, setApiKeys] = useState<Record<string, string>>({});
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   // Load saved API keys from sessionStorage
   useEffect(() => {
     if (open) {
-      const saved: Record<string, string> = {};
-      API_CONFIGS.forEach(config => {
-        const savedKey = sessionStorage.getItem(`subchat_api_${config.provider}`);
-        if (savedKey) {
-          saved[config.provider] = savedKey;
+      const keys: Record<string, string> = {};
+      API_PROVIDERS.forEach(provider => {
+        const saved = sessionStorage.getItem(`subchat_api_${provider.provider}`);
+        if (saved) {
+          keys[provider.provider] = saved;
         }
       });
-      setApiKeys(saved);
+      setApiKeys(keys);
       setError(null);
+      setSuccessMessage(null);
     }
   }, [open]);
 
@@ -86,6 +87,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
       [provider]: value
     }));
     setError(null);
+    setSuccessMessage(null);
   };
 
   const toggleShowKey = (provider: string) => {
@@ -95,53 +97,57 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
     }));
   };
 
-  const handleSave = async (provider: string) => {
+  const handleSaveApiKey = async (provider: string) => {
     const apiKey = apiKeys[provider]?.trim();
     if (!apiKey) return;
 
-    const config = API_CONFIGS.find(c => c.provider === provider);
-    if (!config) return;
+    const providerConfig = API_PROVIDERS.find(p => p.provider === provider);
+    if (!providerConfig) return;
 
     // Validate API key format
-    if (!apiKey.startsWith(config.pattern.replace('^', ''))) {
-      setError(`Invalid ${config.label} API key format. Expected format: ${config.pattern}`);
+    if (!apiKey.startsWith(providerConfig.pattern.replace('^', ''))) {
+      setError(`Invalid ${providerConfig.label} API key format. Expected format: ${providerConfig.pattern}`);
       return;
     }
 
     setSaving(provider);
     setError(null);
+    setSuccessMessage(null);
 
     try {
       await onSaveApiKey(provider, apiKey);
       
-      // Save to sessionStorage (temporary, session-only)
+      // Save to sessionStorage
       sessionStorage.setItem(`subchat_api_${provider}`, apiKey);
       
-      console.log(`✅ ${config.label} API key configured`);
+      setSuccessMessage(`${providerConfig.label} API key configured successfully!`);
+      console.log(`✅ ${providerConfig.label} API key configured`);
+      
     } catch (error) {
-      console.error(`❌ Failed to save ${config.label} API key:`, error);
-      setError(`Failed to configure ${config.label}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error(`❌ Failed to save ${providerConfig.label} API key:`, error);
+      setError(`Failed to configure ${providerConfig.label}: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setSaving(null);
     }
   };
 
-  const handleDelete = (provider: string) => {
+  const handleRemoveApiKey = (provider: string) => {
     setApiKeys(prev => {
-      const newKeys = { ...prev };
-      delete newKeys[provider];
-      return newKeys;
+      const updated = { ...prev };
+      delete updated[provider];
+      return updated;
     });
     sessionStorage.removeItem(`subchat_api_${provider}`);
+    setSuccessMessage(null);
   };
 
-  const maskApiKey = (apiKey: string): string => {
-    if (!apiKey) return '';
-    if (apiKey.length <= 8) return '*'.repeat(apiKey.length);
-    return apiKey.slice(0, 4) + '*'.repeat(apiKey.length - 8) + apiKey.slice(-4);
+  const maskApiKey = (key: string): string => {
+    if (!key) return '';
+    if (key.length <= 8) return '*'.repeat(key.length);
+    return key.slice(0, 4) + '*'.repeat(key.length - 8) + key.slice(-4);
   };
 
-  const getSavedKeyCount = (): number => {
+  const getConfiguredCount = () => {
     return Object.keys(apiKeys).filter(provider => apiKeys[provider]).length;
   };
 
@@ -149,7 +155,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle>
         <Stack direction="row" alignItems="center" spacing={1}>
-          <Settings />
+          <SettingsIcon />
           <Typography variant="h6">API Keys Configuration</Typography>
         </Stack>
       </DialogTitle>
@@ -158,14 +164,14 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
         <Stack spacing={3}>
           <Alert severity="info">
             <Typography variant="body2">
-              Configure API keys to enable OpenClaw AI features. Keys are stored temporarily in your session only.
+              Configure API keys to enable OpenClaw AI features. Keys are stored in the OpenClaw configuration file and session storage.
             </Typography>
           </Alert>
 
-          {getSavedKeyCount() > 0 && (
+          {getConfiguredCount() > 0 && (
             <Alert severity="success">
               <Typography variant="body2">
-                {getSavedKeyCount()} API key(s) configured. You can now start conversations!
+                {getConfiguredCount()} API key(s) configured. OpenClaw Gateway will use these for model requests.
               </Typography>
             </Alert>
           )}
@@ -176,42 +182,48 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
             </Alert>
           )}
 
-          {API_CONFIGS.map((config) => {
-            const hasKey = !!apiKeys[config.provider];
-            const isVisible = showKeys[config.provider];
-            const isSaving = saving === config.provider;
+          {successMessage && (
+            <Alert severity="success">
+              {successMessage}
+            </Alert>
+          )}
+
+          {API_PROVIDERS.map(provider => {
+            const hasKey = !!apiKeys[provider.provider];
+            const showKey = showKeys[provider.provider];
+            const isLoading = saving === provider.provider;
 
             return (
-              <Box key={config.provider}>
+              <Box key={provider.provider}>
                 <Stack direction="row" alignItems="center" spacing={1} mb={1}>
                   <Typography variant="subtitle1" fontWeight={600}>
-                    {config.label}
+                    {provider.label}
                   </Typography>
                   {hasKey && <Chip label="Configured" size="small" color="success" />}
                 </Stack>
                 
                 <Typography variant="body2" color="text.secondary" mb={2}>
-                  {config.description}
+                  {provider.description}
                 </Typography>
 
                 <Stack direction="row" spacing={1} alignItems="flex-end">
                   <TextField
                     fullWidth
-                    type={hasKey && !isVisible ? 'password' : 'text'}
+                    type={hasKey && !showKey ? 'password' : 'text'}
                     variant="outlined"
-                    placeholder={config.placeholder}
-                    value={hasKey && !isVisible ? maskApiKey(apiKeys[config.provider] || '') : apiKeys[config.provider] || ''}
-                    onChange={(e) => handleApiKeyChange(config.provider, e.target.value)}
-                    disabled={isSaving}
+                    placeholder={provider.placeholder}
+                    value={hasKey && !showKey ? maskApiKey(apiKeys[provider.provider] || '') : (apiKeys[provider.provider] || '')}
+                    onChange={(e) => handleApiKeyChange(provider.provider, e.target.value)}
+                    disabled={isLoading}
                     size="small"
                     InputProps={{
                       endAdornment: hasKey ? (
                         <InputAdornment position="end">
                           <IconButton
-                            onClick={() => toggleShowKey(config.provider)}
+                            onClick={() => toggleShowKey(provider.provider)}
                             size="small"
                           >
-                            {isVisible ? <VisibilityOff /> : <Visibility />}
+                            {showKey ? <VisibilityOffIcon /> : <VisibilityIcon />}
                           </IconButton>
                         </InputAdornment>
                       ) : undefined
@@ -220,30 +232,63 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
                   
                   <Button
                     variant="contained"
-                    onClick={() => handleSave(config.provider)}
-                    disabled={!apiKeys[config.provider]?.trim() || isSaving}
-                    startIcon={isSaving ? undefined : <Save />}
+                    onClick={() => handleSaveApiKey(provider.provider)}
+                    disabled={!apiKeys[provider.provider]?.trim() || isLoading}
+                    startIcon={isLoading ? <CircularProgress size={16} /> : <SaveIcon />}
                     size="small"
                   >
-                    {isSaving ? 'Saving...' : 'Save'}
+                    {isLoading ? 'Saving...' : 'Save'}
                   </Button>
-                  
+
                   {hasKey && (
                     <IconButton
-                      onClick={() => handleDelete(config.provider)}
+                      onClick={() => handleRemoveApiKey(provider.provider)}
                       color="error"
                       size="small"
                     >
-                      <Delete />
+                      <DeleteIcon />
                     </IconButton>
                   )}
                 </Stack>
               </Box>
             );
           })}
+
+          <Box>
+            <Typography variant="subtitle1" fontWeight={600} mb={1}>
+              Configuration Method
+            </Typography>
+            <Typography variant="body2" color="text.secondary" mb={2}>
+              SubChat uses OpenClaw's config.set API to write API keys directly to the configuration file.
+            </Typography>
+            <Paper sx={{ p: 2, bgcolor: 'grey.100' }}>
+              <Typography variant="body2" component="pre" sx={{ fontFamily: 'monospace', margin: 0 }}>
+{`# Configuration is saved to:
+~/.openclaw/openclaw.json
+
+# In the env.vars section:
+{
+  "env": {
+    "vars": {
+      "ANTHROPIC_API_KEY": "sk-ant-..."
+    }
+  }
+}`}
+              </Typography>
+            </Paper>
+          </Box>
+
+          <Box>
+            <Typography variant="subtitle1" fontWeight={600} mb={1}>
+              About SubChat v2.0.1
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              SubChat provides real-time visibility into OpenClaw agent conversations and enables API key configuration via the Gateway WebSocket API.
+            </Typography>
+          </Box>
         </Stack>
       </DialogContent>
-
+      
       <DialogActions>
         <Button onClick={onClose}>
           Close

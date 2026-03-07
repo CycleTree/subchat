@@ -199,6 +199,46 @@ export class OpenClawGateway {
     console.log('✅ Message sent successfully');
   }
 
+  async configureApiKey(provider: string, apiKey: string): Promise<void> {
+    console.log(`🔧 Configuring ${provider} API key via config.set...`);
+    
+    try {
+      // 1. Get current config
+      const configResponse = await this.request('config.get');
+      const currentConfig = JSON.parse(configResponse.raw);
+      
+      // 2. Update config with API key
+      currentConfig.env = currentConfig.env || {};
+      currentConfig.env.vars = currentConfig.env.vars || {};
+      
+      if (provider === 'anthropic') {
+        currentConfig.env.vars.ANTHROPIC_API_KEY = apiKey;
+      } else if (provider === 'openai') {
+        currentConfig.env.vars.OPENAI_API_KEY = apiKey;
+      } else if (provider === 'gemini') {
+        currentConfig.env.vars.GEMINI_API_KEY = apiKey;
+      } else {
+        throw new Error(`Unsupported provider: ${provider}`);
+      }
+      
+      // 3. Save updated config
+      const updatedConfigRaw = JSON.stringify(currentConfig, null, 2);
+      await this.request('config.set', { raw: updatedConfigRaw, hash: configResponse.hash });
+      
+      console.log(`✅ ${provider} API key configured successfully`);
+      
+      // 4. Verify config was saved
+      const verifyResponse = await this.request('config.get');
+      const verifyConfig = JSON.parse(verifyResponse.raw);
+      
+      console.log(`📊 Config verification:`, verifyConfig.env?.vars);
+      
+    } catch (error) {
+      console.error(`❌ Failed to configure ${provider} API key:`, error);
+      throw new Error(`Failed to configure ${provider}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
   private formatSessionName(key: string): string {
     if (!key) return 'Unknown Session';
     const parts = key.split(':');
