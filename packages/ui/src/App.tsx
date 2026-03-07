@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { CssBaseline, Box, Alert, CircularProgress } from '@mui/material';
 import { SessionList } from './components/SessionList';
+import { SettingsDialog } from './components/SettingsDialog';
 import { ChatView } from './components/ChatView';
 import { GatewayService } from './services/gateway';
 import { useAppStore } from './store';
@@ -58,11 +59,11 @@ export default function App() {
     updateMessage,
     connection,
     setConnection,
-    setCurrentSession,
   } = useAppStore();
 
   const [gateway] = useState(() => new GatewayService());
   const [initError, setInitError] = useState<string | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [gatewayConfig] = useState(getGatewayConfig);
 
   // Initialize Gateway Connection
@@ -141,35 +142,24 @@ export default function App() {
     }
   }, [currentSessionId, connection.isConnected, gateway, addMessage]);
 
-  // Start new conversation handler
-  const handleStartNewConversation = async (message: string): Promise<void> => {
+  // Send message handler
+  // API key configuration handler
+  const handleSaveApiKey = async (provider: string, apiKey: string): Promise<void> => {
     if (!connection.isConnected) {
       throw new Error("Not connected to gateway");
     }
 
-    console.log("💬 Starting new conversation:", message);
+    console.log(`🔑 Configuring ${provider} API key`);
 
     try {
-      // Create new session with initial message
-      const sessionId = await gateway.startNewConversation(message);
-      console.log("✅ New session created:", sessionId);
-
-      // Refresh sessions list
-      const updatedSessions = await gateway.getSessions();
-      setSessions(updatedSessions);
-      console.log("📋 Sessions refreshed after new chat");
-
-      // Select the new session
-      setCurrentSession(sessionId);
-      console.log("🎯 Selected new session:", sessionId);
-
+      await gateway.configureApiKey(provider, apiKey);
+      console.log(`✅ ${provider} API key configured successfully`);
     } catch (error) {
-      console.error("❌ Failed to start new conversation:", error);
+      console.error(`❌ Failed to configure ${provider} API key:`, error);
       throw error;
     }
   };
 
-  // Send message handler
   const handleSendMessage = async (content: string): Promise<void> => {
     if (!currentSessionId || !connection.isConnected) {
       throw new Error('Not connected or no session selected');
@@ -247,7 +237,7 @@ export default function App() {
       <CssBaseline />
       <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
         {/* Session List Sidebar */}
-        <SessionList sessions={sessions} onStartNewConversation={handleStartNewConversation} />
+        <SessionList sessions={sessions} />
         
         {/* Main Chat Area */}
         <ChatView
@@ -257,6 +247,13 @@ export default function App() {
           isConnected={connection.isConnected}
         />
       </Box>
+
+        {/* Settings Dialog */}
+        <SettingsDialog
+          open={settingsOpen}
+          onClose={() => setSettingsOpen(false)}
+          onSaveApiKey={handleSaveApiKey}
+        />
     </ThemeProvider>
   );
 }

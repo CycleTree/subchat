@@ -15,20 +15,23 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  TextField
+  TextField,
+  IconButton
 } from '@mui/material';
-import { Circle, SmartToy, Add, Chat } from '@mui/icons-material';
+import { Circle, SmartToy, Add, Chat, Settings } from '@mui/icons-material';
 import type { Session } from '../../../shared/src/types';
 import { useAppStore } from '../store';
 
 interface SessionListProps {
   sessions: Session[];
   onStartNewConversation?: (message: string) => Promise<void>;
+  onOpenSettings?: () => void;
 }
 
 export const SessionList: React.FC<SessionListProps> = ({ 
   sessions, 
-  onStartNewConversation 
+  onStartNewConversation,
+  onOpenSettings
 }) => {
   const { currentSessionId, setCurrentSession } = useAppStore();
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -76,15 +79,24 @@ export const SessionList: React.FC<SessionListProps> = ({
           <Typography variant="h6" component="h1" sx={{ fontWeight: 600 }}>
             SubChat v2
           </Typography>
-          <Button
-            variant="contained"
-            size="small"
-            startIcon={<Add />}
-            onClick={() => setDialogOpen(true)}
-            sx={{ minWidth: 'auto', px: 2 }}
-          >
-            New
-          </Button>
+          <Stack direction="row" spacing={1}>
+            <IconButton
+              size="small"
+              onClick={() => onOpenSettings?.()}
+              title="Settings"
+            >
+              <Settings fontSize="small" />
+            </IconButton>
+            <Button
+              variant="contained"
+              size="small"
+              startIcon={<Add />}
+              onClick={() => setDialogOpen(true)}
+              sx={{ minWidth: 'auto', px: 2 }}
+            >
+              New
+            </Button>
+          </Stack>
         </Stack>
         <Typography variant="body2" color="text.secondary">
           {sessions.length} sessions

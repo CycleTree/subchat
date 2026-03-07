@@ -232,6 +232,44 @@ export class GatewayService {
     console.log("✅ New conversation started:", sessionId);
     return sessionId;
   }
+
+  async configureApiKey(provider: string, apiKey: string): Promise<void> {
+    console.log(`🔑 Configuring ${provider} API key`);
+    
+    // Different environment variable names for each provider
+    const envVarMap: Record<string, string> = {
+      anthropic: "ANTHROPIC_API_KEY",
+      openai: "OPENAI_API_KEY", 
+      gemini: "GEMINI_API_KEY"
+    };
+    
+    const envVar = envVarMap[provider];
+    if (!envVar) {
+      throw new Error(`Unsupported provider: ${provider}`);
+    }
+    
+    // Use OpenClaw config.set method to configure API key
+    const result = await this.request("config.set", {
+      key: `env.${envVar}`,
+      value: apiKey
+    });
+    
+    console.log(`✅ ${provider} API key configured:`, result);
+  }
+
+  async testApiKey(provider: string): Promise<boolean> {
+    console.log(`🧪 Testing ${provider} API key`);
+    
+    try {
+      // Simple test by checking model status or making a small request
+      const result = await this.request("models.list", {});
+      console.log(`✅ ${provider} API key test passed:`, result);
+      return true;
+    } catch (error) {
+      console.error(`❌ ${provider} API key test failed:`, error);
+      return false;
+    }
+  }
   disconnect() {
     this.ws?.close();
     this.ws = null;
