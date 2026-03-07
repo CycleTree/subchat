@@ -1,28 +1,39 @@
 {
-  "name": "@subchat/root",
-  "version": "0.1.0",
-  "private": true,
-  "description": "OpenClaw サブエージェント会話観測UI",
+  "name": "subchat",
+  "version": "2.0.0",
+  "description": "OpenClaw SubAgent Conversation Visibility Tool",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "npm run dev --workspace=@subchat/ui",
+    "build": "npm run build:shared && npm run build:ui",
+    "build:shared": "npm run build --workspace=@subchat/shared",
+    "build:ui": "npm run build --workspace=@subchat/ui",
+    "preview": "npm run preview --workspace=@subchat/ui",
+    "test": "npm run test --workspace=@subchat/ui",
+    "lint": "npm run lint --workspaces",
+    "deploy:pages": "npm run build && gh-pages -d packages/ui/dist",
+    "fly:deploy": "fly deploy",
+    "fly:logs": "fly logs",
+    "fly:status": "fly status"
+  },
   "workspaces": [
     "packages/*"
   ],
-  "scripts": {
-    "dev": "npm run dev --workspace=@subchat/ui",
-    "build": "npm run build --workspace=@subchat/ui",
-    "clean": "rm -rf node_modules packages/*/node_modules packages/*/dist",
-    "typecheck": "npm run typecheck --workspaces --if-present",
-    "test": "echo 'Manual testing: Open http://localhost:3000 in browser'"
-  },
   "devDependencies": {
-    "@types/node": "^20.0.0",
-    "typescript": "^5.0.0"
+    "gh-pages": "^6.3.0"
   },
-  "engines": {
-    "node": ">=18",
-    "npm": ">=9"
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/CycleTree/subchat"
   },
-  "dependencies": {
-    "playwright-core": "^1.58.2",
-    "ws": "^8.19.0"
-  }
+  "author": "CycleTree",
+  "license": "MIT",
+  "keywords": [
+    "openclaw",
+    "subagent",
+    "conversation",
+    "visibility",
+    "ui"
+  ]
 }

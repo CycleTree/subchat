@@ -93,7 +93,7 @@ export class GatewayService {
         maxProtocol: 3,
         // 🔧 よく使われるclient.id（'client'）
         client: { 
-          id: 'client', 
+          id: 'gateway-client', 
           version: '1.0.0', 
           platform: 'browser',
           mode: 'ui' 

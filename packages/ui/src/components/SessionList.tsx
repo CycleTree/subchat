@@ -1,4 +1,4 @@
-// SubChat v2 - Session List Component
+// SubChat v2 - Session List Component (DOM Structure Fixed)
 import React from 'react';
 import {
   List,
@@ -8,7 +8,8 @@ import {
   Typography,
   Box,
   Badge,
-  Chip
+  Chip,
+  Stack
 } from '@mui/material';
 import { Circle, SmartToy } from '@mui/icons-material';
 import type { Session } from '../../../shared/src/types';
@@ -34,6 +35,11 @@ export const SessionList: React.FC<SessionListProps> = ({ sessions }) => {
     return `${days}d`;
   };
 
+  const handleSessionClick = (sessionId: string) => {
+    console.log('🖱️ Session clicked:', sessionId);
+    setCurrentSession(sessionId);
+  };
+
   return (
     <Box sx={{ width: 320, height: '100vh', borderRight: 1, borderColor: 'divider' }}>
       {/* Header */}
@@ -52,7 +58,7 @@ export const SessionList: React.FC<SessionListProps> = ({ sessions }) => {
           <ListItemButton
             key={session.id}
             selected={session.id === currentSessionId}
-            onClick={() => setCurrentSession(session.id)}
+            onClick={() => handleSessionClick(session.id)}
             sx={{
               py: 1.5,
               px: 2,
@@ -77,17 +83,17 @@ export const SessionList: React.FC<SessionListProps> = ({ sessions }) => {
             
             <ListItemText
               primary={
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Stack direction="row" alignItems="center" spacing={1}>
                   <Typography variant="body2" component="span" noWrap sx={{ fontWeight: 500 }}>
                     {session.name}
                   </Typography>
                   {session.isActive && (
                     <Circle sx={{ fontSize: 8, color: 'success.main' }} />
                   )}
-                </Box>
+                </Stack>
               }
               secondary={
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 0.5 }}>
+                <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1} sx={{ mt: 0.5 }}>
                   <Chip
                     label={session.agentId}
                     size="small"
@@ -97,7 +103,7 @@ export const SessionList: React.FC<SessionListProps> = ({ sessions }) => {
                   <Typography variant="caption" color="text.secondary">
                     {formatTime(session.lastActivity)}
                   </Typography>
-                </Box>
+                </Stack>
               }
             />
             

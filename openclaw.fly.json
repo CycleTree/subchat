@@ -1,0 +1,33 @@
+{
+  "gateway": {
+    "port": 8080,
+    "host": "0.0.0.0",
+    "cors": {
+      "origins": [
+        "https://cycletree.github.io",
+        "https://*.github.io",
+        "http://localhost:3000"
+      ]
+    },
+    "websocket": {
+      "enabled": true,
+      "path": "/gateway"
+    },
+    "auth": {
+      "tokens": {
+        "subchat-production": "${OPENCLAW_TOKEN}"
+      }
+    }
+  },
+  "agents": {
+    "defaultAgent": "fixus",
+    "allowedAgents": ["fixus", "assistant", "subchat-observer"]
+  },
+  "logging": {
+    "level": "info",
+    "format": "json"
+  },
+  "storage": {
+    "path": "/data"
+  }
+}
