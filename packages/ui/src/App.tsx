@@ -5,8 +5,8 @@ import { useAppStore } from './store';
 import { OpenClawGateway } from './services/gateway';
 import { SessionList } from './components/SessionList';
 import { ChatView } from './components/ChatView';
-import { testGateway } from './utils/websocketTest';
 import { SettingsDialog } from './components/SettingsDialog';
+import { testGateway } from './utils/websocketTest';
 
 const theme = createTheme({
   palette: {
@@ -43,12 +43,58 @@ function App() {
   const [initError, setInitError] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
+  // Enhanced function to get gateway token with better error handling
+  const getGatewayToken = (): string => {
+    // 1. Try session storage first
+    const savedToken = sessionStorage.getItem('subchat_gateway_token');
+    if (savedToken && savedToken.length > 10) {
+      console.log('🔑 Using saved Gateway token from session storage');
+      return savedToken;
+    }
+    
+    // 2. Try localStorage as backup
+    const localToken = localStorage.getItem('subchat_gateway_token');
+    if (localToken && localToken.length > 10) {
+      console.log('🔑 Using Gateway token from localStorage');
+      sessionStorage.setItem('subchat_gateway_token', localToken);
+      return localToken;
+    }
+    
+    // 3. Use default tokens
+    const isDevelopment = window.location.hostname === 'localhost';
+    const defaultToken = isDevelopment 
+      ? '3a46fc7cb69ecda092d43712ed997b7c8ffd5b4449a97c2f'  
+      : 'subchat-gateway-token-2026';
+    
+    console.log('🔑 Using default Gateway token for', isDevelopment ? 'development' : 'production');
+    return defaultToken;
+  };
+
+  // Enhanced gateway initialization with retry logic
   useEffect(() => {
-    const initializeGateway = async () => {
-      setConnection({ isConnected: false, isConnecting: true });
+    let retryCount = 0;
+    const maxRetries = 3;
+    let retryTimeout: any;
+
+    const initializeGateway = async (isRetry = false): Promise<void> => {
+      if (isRetry) {
+        console.log(`🔄 Retry attempt ${retryCount}/${maxRetries}`);
+      } else {
+        console.log('🚀 Initializing SubChat...');
+        setConnection({ isConnected: false, isConnecting: true });
+      }
+
+      setInitError(null);
 
       gateway.onConnectionChange = (isConnected: boolean) => {
+        console.log('🔗 Connection state changed:', isConnected);
         setConnection({ isConnected, isConnecting: false });
+        
+        if (!isConnected && retryCount < maxRetries) {
+          retryCount++;
+          console.log(`⏰ Will retry in 3 seconds... (${retryCount}/${maxRetries})`);
+          retryTimeout = setTimeout(() => initializeGateway(true), 3000);
+        }
       };
 
       try {
@@ -57,15 +103,17 @@ function App() {
           ? 'ws://localhost:18792/gateway'
           : 'wss://subchat-openclaw-gateway.fly.dev/gateway';
         
-        const authToken = isDevelopment
-          ? '3a46fc7cb69ecda092d43712ed997b7c8ffd5b4449a97c2f'  
-          : 'subchat-gateway-token-2026';
+        const authToken = getGatewayToken();
 
         console.log('🌐 Environment:', isDevelopment ? 'Development' : 'Production');
         console.log('🔗 Gateway URL:', gatewayUrl);
+        console.log('🔑 Auth Token:', authToken.slice(0, 10) + '...');
 
         await gateway.connect(gatewayUrl, authToken);
-        console.log('✅ Gateway connected');
+        console.log('✅ Gateway connected successfully');
+
+        // Reset retry count on successful connection
+        retryCount = 0;
 
         const initialSessions = await gateway.getSessions();
         setSessions(initialSessions);
@@ -73,25 +121,47 @@ function App() {
 
       } catch (error) {
         console.error('❌ Gateway initialization failed:', error);
-        setInitError(`Connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        
+        if (errorMessage.includes('unauthorized') || errorMessage.includes('token mismatch')) {
+          setInitError('Authentication failed: Gateway token mismatch. Open browser console and run fixGatewayAuth() or configure in Settings.');
+        } else if (errorMessage.includes('connection failed') || errorMessage.includes('WebSocket connection failed')) {
+          setInitError('Connection failed: Cannot reach OpenClaw Gateway. Please check if Gateway is running.');
+        } else {
+          setInitError(`Connection failed: ${errorMessage}`);
+        }
+        
         setConnection({ isConnected: false, isConnecting: false });
+        
+        // Retry logic for connection failures (but not auth failures)
+        if (!errorMessage.includes('unauthorized') && retryCount < maxRetries) {
+          retryCount++;
+          console.log(`⏰ Will retry in 5 seconds... (${retryCount}/${maxRetries})`);
+          retryTimeout = setTimeout(() => initializeGateway(true), 5000);
+        }
       }
     };
 
+    // Start initialization
     initializeGateway();
 
+    // Cleanup function
     return () => {
+      if (retryTimeout) {
+        clearTimeout(retryTimeout);
+      }
       gateway.disconnect();
     };
-  }, [setConnection, setSessions]);
+  }, [setConnection, setSessions]); // Only depend on these, not on token changes
 
   useEffect(() => {
     const loadMessages = async () => {
       if (!currentSessionId || !connection.isConnected) return;
 
       try {
-        const sessionMessages = await gateway.getMessages(currentSessionId);
-        console.log(`📬 Loaded ${sessionMessages.length} messages for session:`, currentSessionId);
+        console.log(`📬 Loading messages for session: ${currentSessionId}`);
+        const sessionMessages = await gateway.getMessages(currentSessionId); // Refresh messages
+        console.log(`✅ Loaded ${sessionMessages.length} messages`);
         
         sessionMessages.forEach(message => {
           addMessage({
@@ -140,9 +210,10 @@ function App() {
 
       console.log('✅ Message sent:', content);
       
+      // Refresh messages after a delay
       setTimeout(async () => {
         try {
-          await gateway.getMessages(currentSessionId);
+          await gateway.getMessages(currentSessionId); // Refresh messages
           console.log('🔄 Messages refreshed');
         } catch (error) {
           console.error('❌ Failed to refresh messages:', error);
@@ -173,6 +244,20 @@ function App() {
               zIndex: 1000,
               maxWidth: '80vw'
             }}
+            action={
+              <button 
+                onClick={() => setSettingsOpen(true)}
+                style={{
+                  background: 'none',
+                  border: 'none', 
+                  color: 'inherit',
+                  textDecoration: 'underline',
+                  cursor: 'pointer'
+                }}
+              >
+                Open Settings
+              </button>
+            }
           >
             {initError}
           </Alert>
