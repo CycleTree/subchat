@@ -41,7 +41,7 @@ const getGatewayConfig = () => {
   } else {
     // Production: Fly.io OpenClaw Gateway
     return {
-      url: 'wss://your-openclaw-app.fly.dev/gateway',  // Will be updated with actual Fly.io URL
+      url: 'wss://subchat-openclaw-gateway.fly.dev/gateway',  // Will be updated with actual Fly.io URL
       token: import.meta.env.VITE_OPENCLAW_TOKEN || '3a46fc7cb69ecda092d43712ed997b7c8ffd5b4449a97c2f'
     };
   }
