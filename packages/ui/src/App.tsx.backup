@@ -58,7 +58,6 @@ export default function App() {
     updateMessage,
     connection,
     setConnection,
-    setCurrentSession,
   } = useAppStore();
 
   const [gateway] = useState(() => new GatewayService());
@@ -141,34 +140,6 @@ export default function App() {
     }
   }, [currentSessionId, connection.isConnected, gateway, addMessage]);
 
-  // Start new conversation handler
-  const handleStartNewConversation = async (message: string): Promise<void> => {
-    if (!connection.isConnected) {
-      throw new Error("Not connected to gateway");
-    }
-
-    console.log("💬 Starting new conversation:", message);
-
-    try {
-      // Create new session with initial message
-      const sessionId = await gateway.startNewConversation(message);
-      console.log("✅ New session created:", sessionId);
-
-      // Refresh sessions list
-      const updatedSessions = await gateway.getSessions();
-      setSessions(updatedSessions);
-      console.log("📋 Sessions refreshed after new chat");
-
-      // Select the new session
-      setCurrentSession(sessionId);
-      console.log("🎯 Selected new session:", sessionId);
-
-    } catch (error) {
-      console.error("❌ Failed to start new conversation:", error);
-      throw error;
-    }
-  };
-
   // Send message handler
   const handleSendMessage = async (content: string): Promise<void> => {
     if (!currentSessionId || !connection.isConnected) {
@@ -247,7 +218,7 @@ export default function App() {
       <CssBaseline />
       <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
         {/* Session List Sidebar */}
-        <SessionList sessions={sessions} onStartNewConversation={handleStartNewConversation} />
+        <SessionList sessions={sessions} />
         
         {/* Main Chat Area */}
         <ChatView
