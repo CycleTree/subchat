@@ -13,6 +13,32 @@
         -moz-osx-font-smoothing: grayscale;
       }
     </style>
+  <!-- SubChat Development Helpers -->
+  <script>
+    if (window.location.hostname === "localhost") {
+      window.setGatewayToken = function(token) {
+        sessionStorage.setItem("subchat_gateway_token", token);
+        console.log("✅ Gateway token saved");
+        console.log("🔄 Refresh page to reconnect");
+        return "Token saved! Refresh page.";
+      };
+      
+      window.fixGatewayAuth = function() {
+        sessionStorage.setItem("subchat_gateway_token", "3a46fc7cb69ecda092d43712ed997b7c8ffd5b4449a97c2f");
+        console.log("✅ Correct token set");
+        window.location.reload();
+      };
+      
+      window.showCurrentToken = function() {
+        const token = sessionStorage.getItem("subchat_gateway_token") || "None";
+        console.log("🔑 Current token:", token);
+        return token;
+      };
+      
+      console.log("%c🔧 SubChat Dev Helpers", "color: blue; font-weight: bold");
+      console.log("💡 Gateway auth error? Try: fixGatewayAuth()");
+    }
+  </script>
   </head>
   <body>
     <div id="root"></div>

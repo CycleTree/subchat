@@ -14,14 +14,16 @@ import {
   InputAdornment,
   IconButton,
   CircularProgress,
-  Paper
+  Paper,
+  Divider
 } from '@mui/material';
 import {
   Settings as SettingsIcon,
   Visibility as VisibilityIcon,
   VisibilityOff as VisibilityOffIcon,
   Save as SaveIcon,
-  Delete as DeleteIcon
+  Delete as DeleteIcon,
+  Link as LinkIcon
 } from '@mui/icons-material';
 
 interface SettingsDialogProps {
@@ -54,6 +56,8 @@ const API_PROVIDERS = [
   }
 ];
 
+const GATEWAY_TOKEN_KEY = 'subchat_gateway_token';
+
 export const SettingsDialog: React.FC<SettingsDialogProps> = ({ 
   open, 
   onClose, 
@@ -61,11 +65,13 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
 }) => {
   const [apiKeys, setApiKeys] = useState<Record<string, string>>({});
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
+  const [gatewayToken, setGatewayToken] = useState('');
+  const [showGatewayToken, setShowGatewayToken] = useState(false);
   const [saving, setSaving] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  // Load saved API keys from sessionStorage
+  // Load saved API keys and gateway token from sessionStorage
   useEffect(() => {
     if (open) {
       const keys: Record<string, string> = {};
@@ -76,6 +82,13 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
         }
       });
       setApiKeys(keys);
+      
+      // Load gateway token
+      const savedGatewayToken = sessionStorage.getItem(GATEWAY_TOKEN_KEY);
+      if (savedGatewayToken) {
+        setGatewayToken(savedGatewayToken);
+      }
+      
       setError(null);
       setSuccessMessage(null);
     }
@@ -86,6 +99,12 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
       ...prev,
       [provider]: value
     }));
+    setError(null);
+    setSuccessMessage(null);
+  };
+
+  const handleGatewayTokenChange = (value: string) => {
+    setGatewayToken(value);
     setError(null);
     setSuccessMessage(null);
   };
@@ -131,6 +150,15 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
     }
   };
 
+  const handleSaveGatewayToken = () => {
+    if (!gatewayToken.trim()) return;
+    
+    // Save gateway token to sessionStorage
+    sessionStorage.setItem(GATEWAY_TOKEN_KEY, gatewayToken.trim());
+    setSuccessMessage('Gateway token saved! Please refresh the page to reconnect.');
+    console.log('✅ Gateway token saved to sessionStorage');
+  };
+
   const handleRemoveApiKey = (provider: string) => {
     setApiKeys(prev => {
       const updated = { ...prev };
@@ -139,6 +167,12 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
     });
     sessionStorage.removeItem(`subchat_api_${provider}`);
     setSuccessMessage(null);
+  };
+
+  const handleRemoveGatewayToken = () => {
+    setGatewayToken('');
+    sessionStorage.removeItem(GATEWAY_TOKEN_KEY);
+    setSuccessMessage('Gateway token removed! Please refresh the page.');
   };
 
   const maskApiKey = (key: string): string => {
@@ -156,7 +190,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
       <DialogTitle>
         <Stack direction="row" alignItems="center" spacing={1}>
           <SettingsIcon />
-          <Typography variant="h6">API Keys Configuration</Typography>
+          <Typography variant="h6">SubChat Configuration</Typography>
         </Stack>
       </DialogTitle>
       
@@ -164,17 +198,10 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
         <Stack spacing={3}>
           <Alert severity="info">
             <Typography variant="body2">
-              Configure API keys to enable OpenClaw AI features. Keys are stored in the OpenClaw configuration file and session storage.
+              Configure Gateway connection and API keys for OpenClaw AI features.
+              Keys are stored in session storage and OpenClaw configuration.
             </Typography>
           </Alert>
-
-          {getConfiguredCount() > 0 && (
-            <Alert severity="success">
-              <Typography variant="body2">
-                {getConfiguredCount()} API key(s) configured. OpenClaw Gateway will use these for model requests.
-              </Typography>
-            </Alert>
-          )}
 
           {error && (
             <Alert severity="error">
@@ -188,85 +215,165 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
             </Alert>
           )}
 
-          {API_PROVIDERS.map(provider => {
-            const hasKey = !!apiKeys[provider.provider];
-            const showKey = showKeys[provider.provider];
-            const isLoading = saving === provider.provider;
+          {/* Gateway Token Configuration */}
+          <Box>
+            <Stack direction="row" alignItems="center" spacing={1} mb={1}>
+              <LinkIcon color="primary" />
+              <Typography variant="subtitle1" fontWeight={600}>
+                OpenClaw Gateway Token
+              </Typography>
+              {gatewayToken && <Chip label="Configured" size="small" color="primary" />}
+            </Stack>
+            
+            <Typography variant="body2" color="text.secondary" mb={2}>
+              WebSocket authentication token for OpenClaw Gateway connection
+            </Typography>
 
-            return (
-              <Box key={provider.provider}>
-                <Stack direction="row" alignItems="center" spacing={1} mb={1}>
-                  <Typography variant="subtitle1" fontWeight={600}>
-                    {provider.label}
-                  </Typography>
-                  {hasKey && <Chip label="Configured" size="small" color="success" />}
-                </Stack>
-                
-                <Typography variant="body2" color="text.secondary" mb={2}>
-                  {provider.description}
+            <Stack direction="row" spacing={1} alignItems="flex-end">
+              <TextField
+                fullWidth
+                type={showGatewayToken ? 'text' : 'password'}
+                variant="outlined"
+                placeholder="Gateway authentication token..."
+                value={showGatewayToken ? gatewayToken : maskApiKey(gatewayToken)}
+                onChange={(e) => handleGatewayTokenChange(e.target.value)}
+                size="small"
+                InputProps={{
+                  endAdornment: gatewayToken ? (
+                    <InputAdornment position="end">
+                      <IconButton
+                        onClick={() => setShowGatewayToken(!showGatewayToken)}
+                        size="small"
+                      >
+                        {showGatewayToken ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                      </IconButton>
+                    </InputAdornment>
+                  ) : undefined
+                }}
+              />
+              
+              <Button
+                variant="contained"
+                onClick={handleSaveGatewayToken}
+                disabled={!gatewayToken.trim()}
+                startIcon={<SaveIcon />}
+                size="small"
+              >
+                Save
+              </Button>
+
+              {gatewayToken && (
+                <IconButton
+                  onClick={handleRemoveGatewayToken}
+                  color="error"
+                  size="small"
+                >
+                  <DeleteIcon />
+                </IconButton>
+              )}
+            </Stack>
+          </Box>
+
+          <Divider />
+
+          {/* API Keys Section */}
+          <Box>
+            <Typography variant="h6" mb={1}>
+              API Keys Configuration
+            </Typography>
+            
+            {getConfiguredCount() > 0 && (
+              <Alert severity="success" sx={{ mb: 2 }}>
+                <Typography variant="body2">
+                  {getConfiguredCount()} API key(s) configured. OpenClaw Gateway will use these for model requests.
                 </Typography>
+              </Alert>
+            )}
 
-                <Stack direction="row" spacing={1} alignItems="flex-end">
-                  <TextField
-                    fullWidth
-                    type={hasKey && !showKey ? 'password' : 'text'}
-                    variant="outlined"
-                    placeholder={provider.placeholder}
-                    value={hasKey && !showKey ? maskApiKey(apiKeys[provider.provider] || '') : (apiKeys[provider.provider] || '')}
-                    onChange={(e) => handleApiKeyChange(provider.provider, e.target.value)}
-                    disabled={isLoading}
-                    size="small"
-                    InputProps={{
-                      endAdornment: hasKey ? (
-                        <InputAdornment position="end">
-                          <IconButton
-                            onClick={() => toggleShowKey(provider.provider)}
-                            size="small"
-                          >
-                            {showKey ? <VisibilityOffIcon /> : <VisibilityIcon />}
-                          </IconButton>
-                        </InputAdornment>
-                      ) : undefined
-                    }}
-                  />
-                  
-                  <Button
-                    variant="contained"
-                    onClick={() => handleSaveApiKey(provider.provider)}
-                    disabled={!apiKeys[provider.provider]?.trim() || isLoading}
-                    startIcon={isLoading ? <CircularProgress size={16} /> : <SaveIcon />}
-                    size="small"
-                  >
-                    {isLoading ? 'Saving...' : 'Save'}
-                  </Button>
+            <Stack spacing={3}>
+              {API_PROVIDERS.map(provider => {
+                const hasKey = !!apiKeys[provider.provider];
+                const showKey = showKeys[provider.provider];
+                const isLoading = saving === provider.provider;
 
-                  {hasKey && (
-                    <IconButton
-                      onClick={() => handleRemoveApiKey(provider.provider)}
-                      color="error"
-                      size="small"
-                    >
-                      <DeleteIcon />
-                    </IconButton>
-                  )}
-                </Stack>
-              </Box>
-            );
-          })}
+                return (
+                  <Box key={provider.provider}>
+                    <Stack direction="row" alignItems="center" spacing={1} mb={1}>
+                      <Typography variant="subtitle1" fontWeight={600}>
+                        {provider.label}
+                      </Typography>
+                      {hasKey && <Chip label="Configured" size="small" color="success" />}
+                    </Stack>
+                    
+                    <Typography variant="body2" color="text.secondary" mb={2}>
+                      {provider.description}
+                    </Typography>
+
+                    <Stack direction="row" spacing={1} alignItems="flex-end">
+                      <TextField
+                        fullWidth
+                        type={hasKey && !showKey ? 'password' : 'text'}
+                        variant="outlined"
+                        placeholder={provider.placeholder}
+                        value={hasKey && !showKey ? maskApiKey(apiKeys[provider.provider] || '') : (apiKeys[provider.provider] || '')}
+                        onChange={(e) => handleApiKeyChange(provider.provider, e.target.value)}
+                        disabled={isLoading}
+                        size="small"
+                        InputProps={{
+                          endAdornment: hasKey ? (
+                            <InputAdornment position="end">
+                              <IconButton
+                                onClick={() => toggleShowKey(provider.provider)}
+                                size="small"
+                              >
+                                {showKey ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                              </IconButton>
+                            </InputAdornment>
+                          ) : undefined
+                        }}
+                      />
+                      
+                      <Button
+                        variant="contained"
+                        onClick={() => handleSaveApiKey(provider.provider)}
+                        disabled={!apiKeys[provider.provider]?.trim() || isLoading}
+                        startIcon={isLoading ? <CircularProgress size={16} /> : <SaveIcon />}
+                        size="small"
+                      >
+                        {isLoading ? 'Saving...' : 'Save'}
+                      </Button>
+
+                      {hasKey && (
+                        <IconButton
+                          onClick={() => handleRemoveApiKey(provider.provider)}
+                          color="error"
+                          size="small"
+                        >
+                          <DeleteIcon />
+                        </IconButton>
+                      )}
+                    </Stack>
+                  </Box>
+                );
+              })}
+            </Stack>
+          </Box>
 
           <Box>
             <Typography variant="subtitle1" fontWeight={600} mb={1}>
-              Configuration Method
+              Configuration Storage
             </Typography>
             <Typography variant="body2" color="text.secondary" mb={2}>
-              SubChat uses OpenClaw's config.set API to write API keys directly to the configuration file.
+              Gateway token is stored in session storage (temporary). API keys are saved to OpenClaw configuration file.
             </Typography>
             <Paper sx={{ p: 2, bgcolor: 'grey.100' }}>
               <Typography variant="body2" component="pre" sx={{ fontFamily: 'monospace', margin: 0 }}>
-{`# Configuration is saved to:
-~/.openclaw/openclaw.json
+{`Session Storage:
+- Gateway Token: subchat_gateway_token
+- API Keys: subchat_api_[provider]
 
-# In the env.vars section:
+OpenClaw Config:
+~/.openclaw/openclaw.json
 {
   "env": {
     "vars": {
@@ -283,7 +390,9 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
               About SubChat v2.1.0
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              SubChat provides real-time visibility into OpenClaw agent conversations and enables API key configuration via the Gateway WebSocket API.
+              SubChat provides real-time visibility into OpenClaw agent conversations and enables 
+              API key configuration via the Gateway WebSocket API. Configure the Gateway token 
+              to establish WebSocket connection.
             </Typography>
           </Box>
         </Stack>

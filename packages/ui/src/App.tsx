@@ -48,7 +48,7 @@ function App() {
           : 'wss://subchat-openclaw-gateway.fly.dev/gateway';
         
         const authToken = isDevelopment
-          ? 'test-token-123'  
+          ? '3a46fc7cb69ecda092d43712ed997b7c8ffd5b4449a97c2f'  
           : 'subchat-gateway-token-2026';
 
         console.log('🌐 Environment:', isDevelopment ? 'Development' : 'Production');
