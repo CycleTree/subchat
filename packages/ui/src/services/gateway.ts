@@ -216,19 +216,45 @@ export class GatewayService {
       throw new Error(`Unsupported provider: ${provider}`);
     }
     
-    try {
-      const result = await this.request("config.set", {
-        raw: {
-          env: {
-            [envVar]: apiKey
-          }
+    // Try multiple formats until one works
+    const formats = [
+      {
+        name: "JSON string format",
+        params: {
+          raw: JSON.stringify({
+            env: {
+              [envVar]: apiKey
+            }
+          })
         }
-      });
-      console.log(`✅ ${provider} API key configured:`, result);
-    } catch (error) {
-      console.error(`❌ Failed to configure ${provider} API key:`, error);
-      throw new Error(`Failed to configure ${provider}: ${error instanceof Error ? error.message : "Unknown error"}`);
+      },
+      {
+        name: "Direct raw value",
+        params: {
+          raw: apiKey,
+          path: `env.${envVar}`
+        }
+      },
+      {
+        name: "Simple raw string",
+        params: {
+          raw: `env.${envVar}=${apiKey}`
+        }
+      }
+    ];
+    
+    for (const format of formats) {
+      try {
+        console.log(`🔧 Trying ${format.name}...`);
+        const result = await this.request("config.set", format.params);
+        console.log(`✅ ${provider} API key configured with ${format.name}:`, result);
+        return;
+      } catch (error) {
+        console.log(`❌ ${format.name} failed:`, error);
+      }
     }
+    
+    throw new Error(`Failed to configure ${provider}: All configuration formats failed`);
   }
 
   async spawnSession(task: string, agentId?: string): Promise<string> {
