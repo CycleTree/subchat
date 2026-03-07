@@ -1,0 +1,13 @@
+{
+  "gateway": {
+    "port": 18792,
+    "bind": "lan",
+    "auth": {
+      "mode": "token",
+      "token": "test-token-123"
+    },
+    "controlUi": {
+      "allowedOrigins": ["*"]
+    }
+  }
+}

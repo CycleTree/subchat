@@ -1,6 +1,6 @@
 {
   "name": "subchat",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "OpenClaw SubAgent Conversation Visibility Tool",
   "main": "index.js",
   "type": "module",

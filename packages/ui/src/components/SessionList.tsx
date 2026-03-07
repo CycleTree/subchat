@@ -1,4 +1,4 @@
-// SubChat v2 - Session List Component with New Chat Feature
+// SubChat v2.0.1 - Session List Component with New Chat Feature
 import React, { useState } from 'react';
 import {
   List,
@@ -77,7 +77,7 @@ export const SessionList: React.FC<SessionListProps> = ({
       <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
         <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1}>
           <Typography variant="h6" component="h1" sx={{ fontWeight: 600 }}>
-            SubChat v2
+            SubChat v2.0.1
           </Typography>
           <Stack direction="row" spacing={1}>
             <IconButton
