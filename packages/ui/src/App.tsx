@@ -5,6 +5,7 @@ import { useAppStore } from './store';
 import { OpenClawGateway } from './services/gateway';
 import { SessionList } from './components/SessionList';
 import { ChatView } from './components/ChatView';
+import { testGateway } from './utils/websocketTest';
 import { SettingsDialog } from './components/SettingsDialog';
 
 const theme = createTheme({
@@ -18,6 +19,15 @@ const theme = createTheme({
 });
 
 const gateway = new OpenClawGateway();
+
+// Development tools
+if (typeof window !== "undefined" && window.location.hostname === "localhost") {
+  (window as any).testGateway = testGateway;
+  (window as any).gateway = gateway;
+  console.log("🔧 SubChat dev tools loaded:");
+  console.log("  testGateway() - Test WebSocket connection");
+  console.log("  fixGatewayAuth() - Fix authentication token");
+}
 
 function App() {
   const {

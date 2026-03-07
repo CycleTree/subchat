@@ -35,5 +35,8 @@
     "conversation",
     "visibility",
     "ui"
-  ]
+  ],
+  "dependencies": {
+    "ws": "^8.19.0"
+  }
 }
