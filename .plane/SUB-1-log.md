@@ -32,3 +32,11 @@
 - 場所: `packages/ui/src/theme.ts`
 - light/darkそれぞれ12色のCSS変数を定義
 - applyCssVariables関数でdocument.documentElement.styleに適用
+
+## 結果
+- completed_at: 2026-03-09T19:29:15Z
+- status: completed
+- note: 既に実装済み。commit 76a8659, a2868fb 確認
+
+## Plane 更新
+- state: Todo → Done
