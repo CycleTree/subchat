@@ -7,6 +7,8 @@ export interface Session {
   lastActivity: Date;
   messageCount: number;
   isActive: boolean;
+  parentSessionId?: string;
+  childSessionIds?: string[];
 }
 
 export interface Message {
