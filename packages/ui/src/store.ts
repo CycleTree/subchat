@@ -17,9 +17,20 @@ export interface SessionTreeNode {
   hasMissingParent: boolean;
 }
 
+export interface InterventionEntry {
+  id: string;
+  sessionId: string;
+  content: string;
+  timestamp: Date;
+  status: 'pending' | 'sent' | 'failed';
+  transport?: 'sessions_send' | 'chat.send';
+  error?: string;
+}
+
 // localStorage keys for persistence
 const THEME_STORAGE_KEY = 'subchat_theme_mode';
 const VIEW_MODE_STORAGE_KEY = 'subchat_view_mode';
+const INTERVENTIONS_STORAGE_KEY = 'subchat_interventions';
 
 // Get initial theme from localStorage or system preference
 const getInitialTheme = (): ThemeMode => {
@@ -40,6 +51,34 @@ const getInitialViewMode = (): ViewMode => {
     return stored;
   }
   return 'flat';
+};
+
+const getInitialInterventions = (): Record<string, InterventionEntry[]> => {
+  const stored = localStorage.getItem(INTERVENTIONS_STORAGE_KEY);
+  if (!stored) {
+    return {};
+  }
+
+  try {
+    const parsed = JSON.parse(stored) as Record<string, Array<Omit<InterventionEntry, 'timestamp'> & { timestamp: string }>>;
+    return Object.fromEntries(
+      Object.entries(parsed).map(([sessionId, entries]) => [
+        sessionId,
+        entries.map((entry) => ({
+          ...entry,
+          timestamp: new Date(entry.timestamp)
+        }))
+      ])
+    );
+  } catch (error) {
+    console.error('Failed to restore intervention history:', error);
+    localStorage.removeItem(INTERVENTIONS_STORAGE_KEY);
+    return {};
+  }
+};
+
+const persistInterventions = (interventions: Record<string, InterventionEntry[]>) => {
+  localStorage.setItem(INTERVENTIONS_STORAGE_KEY, JSON.stringify(interventions));
 };
 
 // Build session tree from flat session list
@@ -133,6 +172,7 @@ interface AppStore {
   connection: ConnectionState;
   drafts: Record<string, string>;
   queuedMessages: QueuedMessage[];
+  interventions: Record<string, InterventionEntry[]>;
   themeMode: ThemeMode;
   viewMode: ViewMode;
 
@@ -164,6 +204,11 @@ interface AppStore {
   removeQueuedMessage: (messageId: string) => void;
   getQueuedCount: () => number;
   getSessionQueuedCount: (sessionId: string) => number;
+
+  // Intervention actions
+  addIntervention: (entry: InterventionEntry) => void;
+  updateIntervention: (entryId: string, updates: Partial<InterventionEntry>) => void;
+  getSessionInterventions: (sessionId: string) => InterventionEntry[];
   
   // Computed
   getCurrentMessages: () => Message[];
@@ -181,6 +226,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
   },
   drafts: {},
   queuedMessages: [],
+  interventions: getInitialInterventions(),
   themeMode: getInitialTheme(),
   viewMode: getInitialViewMode(),
   
@@ -193,6 +239,20 @@ export const useAppStore = create<AppStore>((set, get) => ({
   
   addMessage: (message) => set((state) => {
     const sessionMessages = state.messages[message.sessionId] || [];
+    const existingIndex = sessionMessages.findIndex((entry) => entry.id === message.id);
+
+    if (existingIndex >= 0) {
+      const nextMessages = [...sessionMessages];
+      nextMessages[existingIndex] = { ...nextMessages[existingIndex], ...message };
+
+      return {
+        messages: {
+          ...state.messages,
+          [message.sessionId]: nextMessages
+        }
+      };
+    }
+
     return {
       messages: {
         ...state.messages,
@@ -286,6 +346,49 @@ export const useAppStore = create<AppStore>((set, get) => ({
   getSessionQueuedCount: (sessionId) => {
     const state = get();
     return state.queuedMessages.filter(msg => msg.sessionId === sessionId).length;
+  },
+
+  addIntervention: (entry) => set((state) => {
+    const sessionEntries = state.interventions[entry.sessionId] || [];
+    const existingIndex = sessionEntries.findIndex((item) => item.id === entry.id);
+
+    let interventions: Record<string, InterventionEntry[]>;
+
+    if (existingIndex >= 0) {
+      const nextEntries = [...sessionEntries];
+      nextEntries[existingIndex] = { ...nextEntries[existingIndex], ...entry };
+
+      interventions = {
+        ...state.interventions,
+        [entry.sessionId]: nextEntries
+      };
+    } else {
+      interventions = {
+        ...state.interventions,
+        [entry.sessionId]: [...sessionEntries, entry]
+      };
+    }
+
+    persistInterventions(interventions);
+    return { interventions };
+  }),
+
+  updateIntervention: (entryId, updates) => set((state) => {
+    const nextInterventions = { ...state.interventions };
+
+    Object.keys(nextInterventions).forEach((sessionId) => {
+      nextInterventions[sessionId] = nextInterventions[sessionId].map((entry) =>
+        entry.id === entryId ? { ...entry, ...updates } : entry
+      );
+    });
+
+    persistInterventions(nextInterventions);
+    return { interventions: nextInterventions };
+  }),
+
+  getSessionInterventions: (sessionId) => {
+    const state = get();
+    return state.interventions[sessionId] || [];
   },
   
   // Computed getters
