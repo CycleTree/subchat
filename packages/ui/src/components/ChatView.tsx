@@ -34,7 +34,14 @@ export const ChatView: React.FC<ChatViewProps> = ({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
   // Store and responsive setup
-  const { clearCurrentSession } = useAppStore();
+  const { 
+    clearCurrentSession, 
+    saveDraft, 
+    clearDraft, 
+    getDraft, 
+    queueMessage,
+    getSessionQueuedCount
+  } = useAppStore();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   
@@ -43,15 +50,56 @@ export const ChatView: React.FC<ChatViewProps> = ({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // Load draft when session changes
+  useEffect(() => {
+    if (session) {
+      const draft = getDraft(session.id);
+      setInputValue(draft);
+    } else {
+      setInputValue('');
+    }
+  }, [session, getDraft]);
+
+  // Enhanced input change handler with draft persistence
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setInputValue(value);
+    
+    // Save draft automatically (debounced by React's batching)
+    if (session) {
+      if (value.trim()) {
+        saveDraft(session.id, value);
+      } else {
+        clearDraft(session.id);
+      }
+    }
+  };
+
   const handleSend = async () => {
     if (!inputValue.trim() || sending || !session) return;
 
+    const messageContent = inputValue.trim();
+    
+    // Clear input and draft immediately for better UX
+    setInputValue('');
+    clearDraft(session.id);
+
+    if (!isConnected) {
+      // Queue message when offline
+      queueMessage(messageContent, session.id);
+      console.log('📥 Message queued for later delivery:', messageContent);
+      return;
+    }
+
+    // Send immediately when online
     setSending(true);
     try {
-      await onSendMessage(inputValue.trim());
-      setInputValue('');
+      await onSendMessage(messageContent);
+      console.log('✅ Message sent immediately:', messageContent);
     } catch (error) {
-      console.error('Failed to send message:', error);
+      console.error('❌ Failed to send message:', error);
+      // On send failure, could re-queue or show error
+      // For now, let the UI handle the error display
     } finally {
       setSending(false);
     }
@@ -83,6 +131,25 @@ export const ChatView: React.FC<ChatViewProps> = ({
 
   const getMessageAlignment = (role: string) => {
     return role === 'user' ? 'flex-end' : 'flex-start';
+  };
+
+  // Dynamic status text based on connection and queue state
+  const getStatusText = () => {
+    if (sending) return "Sending...";
+    if (!isConnected) {
+      const queuedCount = session ? getSessionQueuedCount(session.id) : 0;
+      if (queuedCount > 0) {
+        return `Offline - ${queuedCount} message${queuedCount > 1 ? 's' : ''} queued`;
+      }
+      return "Offline - message will be queued";
+    }
+    return "Press Enter to send • Shift+Enter for new line";
+  };
+
+  // Enhanced placeholder text
+  const getPlaceholder = () => {
+    if (!isConnected) return "Type a message (will be queued)...";
+    return "Type a message...";
   };
 
   if (!session) {
@@ -190,26 +257,37 @@ export const ChatView: React.FC<ChatViewProps> = ({
                 }}
               >
                 <Paper
-                  elevation={1}
+                  elevation={message.status === 'queued' ? 0 : 1}
                   sx={{
                     p: 2,
                     maxWidth: '70%',
-                    bgcolor: message.role === 'user' ? 'primary.light' : 'background.paper',
-                    color: message.role === 'user' ? 'primary.contrastText' : 'text.primary',
+                    bgcolor: message.status === 'queued' ? 'grey.100' : 
+                             message.role === 'user' ? 'primary.light' : 'background.paper',
+                    color: message.status === 'queued' ? 'text.secondary' :
+                           message.role === 'user' ? 'primary.contrastText' : 'text.primary',
+                    opacity: message.status === 'queued' ? 0.8 : 1,
+                    border: message.status === 'queued' ? '1px dashed' : 'none',
+                    borderColor: message.status === 'queued' ? 'warning.main' : 'transparent',
                   }}
                 >
                   <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
                     {message.content}
                   </Typography>
                   
-                  {/* Message status for pending messages */}
-                  {message.status && (
+                  {/* Message status for pending/queued messages */}
+                  {message.status && message.status !== 'sent' && (
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
                       {message.status === 'pending' && (
                         <CircularProgress size={12} />
                       )}
-                      <Typography variant="caption" color="text.secondary">
-                        {message.status}
+                      {message.status === 'queued' && (
+                        <Circle sx={{ fontSize: 8, color: 'warning.main' }} />
+                      )}
+                      <Typography 
+                        variant="caption" 
+                        color={message.status === 'queued' ? 'warning.main' : 'text.secondary'}
+                      >
+                        {message.status === 'queued' ? 'Queued for delivery' : message.status}
                       </Typography>
                     </Box>
                   )}
@@ -241,18 +319,31 @@ export const ChatView: React.FC<ChatViewProps> = ({
             multiline
             maxRows={3}
             variant="outlined"
-            placeholder={isConnected ? "Type a message..." : "Disconnected - cannot send messages"}
+            placeholder={getPlaceholder()}
             value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
+            onChange={handleInputChange}
             onKeyPress={handleKeyPress}
-            disabled={!isConnected || sending}
+            disabled={sending}
             size="small"
+            error={!isConnected && !sending}
+            helperText={!isConnected ? "Offline mode - messages will be queued" : ""}
+            sx={{
+              '& .MuiOutlinedInput-root': {
+                '&.Mui-error': {
+                  '& fieldset': {
+                    borderColor: 'warning.main',
+                    borderWidth: 1,
+                  },
+                },
+              },
+            }}
           />
           <IconButton
             onClick={handleSend}
-            disabled={!inputValue.trim() || !isConnected || sending}
-            color="primary"
+            disabled={!inputValue.trim() || sending}
+            color={!isConnected ? "warning" : "primary"}
             sx={{ mb: 0.5 }}
+            title={!isConnected ? "Message will be queued" : "Send message"}
           >
             {sending ? <CircularProgress size={20} /> : <Send />}
           </IconButton>
@@ -264,7 +355,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
             {isConnected ? '🟢 Online' : '🔴 Offline'}
           </Typography>
           <Typography variant="caption" color="text.secondary">
-            Press Enter to send • Shift+Enter for new line
+            {getStatusText()}
           </Typography>
         </Box>
       </Box>

@@ -37,7 +37,9 @@ function App() {
     setSessions,
     addMessage,
     setConnection,
-    getCurrentMessages
+    getCurrentMessages,
+    queuedMessages,
+    removeQueuedMessage
   } = useAppStore();
 
   const [initError, setInitError] = useState<string | null>(null);
@@ -177,6 +179,58 @@ function App() {
     loadMessages();
   }, [currentSessionId, connection.isConnected, addMessage]);
 
+  // Auto-retry queued messages when connection is restored
+  useEffect(() => {
+    const retryQueuedMessages = async () => {
+      if (!connection.isConnected || queuedMessages.length === 0) return;
+
+      console.log(`🔄 Retrying ${queuedMessages.length} queued messages...`);
+      
+      for (const queuedMsg of queuedMessages) {
+        try {
+          console.log(`📤 Retrying queued message: ${queuedMsg.content.slice(0, 50)}...`);
+          
+          // Send the queued message
+          await gateway.sendMessage(queuedMsg.sessionId, queuedMsg.content);
+          
+          // Add to local messages as sent
+          addMessage({
+            id: `sent-${Date.now()}`,
+            sessionId: queuedMsg.sessionId,
+            role: 'user',
+            content: queuedMsg.content,
+            timestamp: new Date(),
+            status: 'sent'
+          });
+
+          // Remove from queue
+          removeQueuedMessage(queuedMsg.id);
+          
+          console.log(`✅ Successfully sent queued message`);
+          
+          // Small delay between retries to avoid overwhelming the server
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+        } catch (error) {
+          console.error(`❌ Failed to retry message ${queuedMsg.id}:`, error);
+          // Keep in queue for next retry attempt
+          break; // Stop retrying on first failure to maintain order
+        }
+      }
+      
+      if (queuedMessages.length === 0) {
+        console.log('✅ All queued messages sent successfully');
+      }
+    };
+
+    // Trigger retry when connection is restored
+    if (connection.isConnected && queuedMessages.length > 0) {
+      // Small delay to ensure connection is stable
+      const timeoutId = setTimeout(retryQueuedMessages, 1000);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [connection.isConnected, queuedMessages, addMessage, removeQueuedMessage]);
+
   const handleSaveApiKey = async (provider: string, apiKey: string): Promise<void> => {
     if (!connection.isConnected) {
       throw new Error('Not connected to gateway');
@@ -228,6 +282,12 @@ function App() {
 
   const currentSession = sessions.find(s => s.id === currentSessionId) || null;
   const currentMessages = getCurrentMessages();
+  
+  // Combine regular messages with queued messages for display
+  const allMessages = currentSessionId ? [
+    ...currentMessages,
+    ...queuedMessages.filter(msg => msg.sessionId === currentSessionId)
+  ].sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime()) : [];
   
   // Responsive breakpoint detection
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
@@ -281,7 +341,7 @@ function App() {
         {showChatView && (
           <ChatView 
             session={currentSession}
-            messages={currentMessages}
+            messages={allMessages}
             onSendMessage={handleSendMessage}
             isConnected={connection.isConnected}
           />

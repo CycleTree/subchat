@@ -1,6 +1,6 @@
 // SubChat v2 - Zustand Store
 import { create } from 'zustand';
-import type { Session, Message, ConnectionState } from '../../shared/src/types';
+import type { Session, Message, ConnectionState, QueuedMessage } from '../../shared/src/types';
 
 interface AppStore {
   // State
@@ -8,6 +8,8 @@ interface AppStore {
   messages: Record<string, Message[]>;
   currentSessionId: string | null;
   connection: ConnectionState;
+  drafts: Record<string, string>;
+  queuedMessages: QueuedMessage[];
   
   // Actions
   setSessions: (sessions: Session[]) => void;
@@ -16,6 +18,17 @@ interface AppStore {
   addMessage: (message: Message) => void;
   updateMessage: (messageId: string, updates: Partial<Message>) => void;
   setConnection: (connection: ConnectionState) => void;
+  
+  // Draft actions
+  saveDraft: (sessionId: string, content: string) => void;
+  clearDraft: (sessionId: string) => void;
+  getDraft: (sessionId: string) => string;
+  
+  // Queue actions
+  queueMessage: (content: string, sessionId: string) => void;
+  removeQueuedMessage: (messageId: string) => void;
+  getQueuedCount: () => number;
+  getSessionQueuedCount: (sessionId: string) => number;
   
   // Computed
   getCurrentMessages: () => Message[];
@@ -31,6 +44,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
     isConnected: false,
     isConnecting: false,
   },
+  drafts: {},
+  queuedMessages: [],
   
   // Actions
   setSessions: (sessions) => set({ sessions }),
@@ -60,6 +75,54 @@ export const useAppStore = create<AppStore>((set, get) => ({
   }),
   
   setConnection: (connection) => set({ connection }),
+  
+  // Draft actions
+  saveDraft: (sessionId, content) => set((state) => ({
+    drafts: { ...state.drafts, [sessionId]: content }
+  })),
+  
+  clearDraft: (sessionId) => set((state) => {
+    const newDrafts = { ...state.drafts };
+    delete newDrafts[sessionId];
+    return { drafts: newDrafts };
+  }),
+  
+  getDraft: (sessionId) => {
+    const state = get();
+    return state.drafts[sessionId] || '';
+  },
+  
+  // Queue actions
+  queueMessage: (content, sessionId) => set((state) => {
+    const queuedMessage: QueuedMessage = {
+      id: `queued-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      sessionId,
+      role: 'user',
+      content,
+      timestamp: new Date(),
+      status: 'queued',
+      retryCount: 0,
+      queuedAt: new Date(),
+    };
+    
+    return {
+      queuedMessages: [...state.queuedMessages, queuedMessage]
+    };
+  }),
+  
+  removeQueuedMessage: (messageId) => set((state) => ({
+    queuedMessages: state.queuedMessages.filter(msg => msg.id !== messageId)
+  })),
+  
+  getQueuedCount: () => {
+    const state = get();
+    return state.queuedMessages.length;
+  },
+  
+  getSessionQueuedCount: (sessionId) => {
+    const state = get();
+    return state.queuedMessages.filter(msg => msg.sessionId === sessionId).length;
+  },
   
   // Computed getters
   getCurrentMessages: () => {

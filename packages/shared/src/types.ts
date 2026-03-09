@@ -15,7 +15,13 @@ export interface Message {
   role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp: Date;
-  status?: 'pending' | 'sent' | 'failed';
+  status?: 'pending' | 'sent' | 'failed' | 'queued';
+}
+
+export interface QueuedMessage extends Message {
+  status: 'queued';
+  retryCount: number;
+  queuedAt: Date;
 }
 
 export interface ConnectionState {
