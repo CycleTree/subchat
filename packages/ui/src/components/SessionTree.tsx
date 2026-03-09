@@ -1,5 +1,5 @@
 // SubChat v2 - Session Tree Component (Hierarchical View)
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   List,
   ListItemButton,
@@ -9,6 +9,7 @@ import {
   Badge,
   Chip,
   IconButton,
+  Stack,
 } from '@mui/material';
 import {
   Circle,
@@ -16,6 +17,7 @@ import {
   ExpandMore,
   ChevronRight,
   SubdirectoryArrowRight,
+  AccountTree,
 } from '@mui/icons-material';
 import type { SessionTreeNode } from '../store';
 import { useAppStore } from '../store';
@@ -31,6 +33,29 @@ interface TreeNodeProps {
 }
 
 const INDENT_PX = 24;
+
+const collectExpandableIds = (nodes: SessionTreeNode[]) => {
+  const ids = new Set<string>();
+  const walk = (treeNodes: SessionTreeNode[]) => {
+    for (const treeNode of treeNodes) {
+      if (treeNode.children.length > 0) {
+        ids.add(treeNode.session.id);
+        walk(treeNode.children);
+      }
+    }
+  };
+  walk(nodes);
+  return ids;
+};
+
+const countNodes = (nodes: SessionTreeNode[]): number =>
+  nodes.reduce((total, node) => total + 1 + countNodes(node.children), 0);
+
+const countSpawnedNodes = (nodes: SessionTreeNode[]): number =>
+  nodes.reduce(
+    (total, node) => total + (node.depth > 0 ? 1 : 0) + countSpawnedNodes(node.children),
+    0
+  );
 
 const TreeNode: React.FC<TreeNodeProps> = ({ node, expandedIds, onToggleExpand }) => {
   const { currentSessionId, setCurrentSession } = useAppStore();
@@ -175,6 +200,21 @@ const TreeNode: React.FC<TreeNodeProps> = ({ node, expandedIds, onToggleExpand }
               {formatTime(session.lastActivity)}
             </Typography>
           </Box>
+
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mt: 0.75, flexWrap: 'wrap' }}>
+            <Chip
+              label={depth === 0 ? 'root' : 'spawned'}
+              size="small"
+              color={depth === 0 ? 'default' : 'primary'}
+              variant={depth === 0 ? 'outlined' : 'filled'}
+              sx={{ height: 18, fontSize: '0.65rem' }}
+            />
+            {hasChildren && (
+              <Typography variant="caption" color="text.secondary">
+                {children.length} child{children.length === 1 ? '' : 'ren'}
+              </Typography>
+            )}
+          </Box>
         </Box>
 
         {session.messageCount > 0 && (
@@ -205,19 +245,31 @@ const TreeNode: React.FC<TreeNodeProps> = ({ node, expandedIds, onToggleExpand }
 
 export const SessionTree: React.FC<SessionTreeProps> = ({ tree }) => {
   // Start with all nodes expanded
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(() => {
-    const ids = new Set<string>();
-    const collectIds = (nodes: SessionTreeNode[]) => {
-      for (const node of nodes) {
-        if (node.children.length > 0) {
-          ids.add(node.session.id);
-          collectIds(node.children);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(() => collectExpandableIds(tree));
+
+  useEffect(() => {
+    const nextExpandableIds = collectExpandableIds(tree);
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      let changed = false;
+
+      for (const id of nextExpandableIds) {
+        if (!next.has(id)) {
+          next.add(id);
+          changed = true;
         }
       }
-    };
-    collectIds(tree);
-    return ids;
-  });
+
+      for (const id of Array.from(next)) {
+        if (!nextExpandableIds.has(id)) {
+          next.delete(id);
+          changed = true;
+        }
+      }
+
+      return changed ? next : prev;
+    });
+  }, [tree]);
 
   const handleToggleExpand = useCallback((id: string) => {
     setExpandedIds((prev) => {
@@ -241,8 +293,23 @@ export const SessionTree: React.FC<SessionTreeProps> = ({ tree }) => {
     );
   }
 
+  const totalSessions = countNodes(tree);
+  const spawnedSessions = countSpawnedNodes(tree);
+
   return (
-    <List sx={{ flexGrow: 1, overflow: 'auto', p: 0 }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <Box sx={{ px: 2, py: 1.5, borderBottom: 1, borderColor: 'divider' }}>
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
+          <AccountTree fontSize="small" color="action" />
+          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+            Agent hierarchy
+          </Typography>
+        </Stack>
+        <Typography variant="caption" color="text.secondary">
+          {totalSessions} sessions, {spawnedSessions} spawned from parent agents
+        </Typography>
+      </Box>
+      <List sx={{ flexGrow: 1, overflow: 'auto', p: 0 }}>
       {tree.map((node) => (
         <TreeNode
           key={node.session.id}
@@ -251,6 +318,7 @@ export const SessionTree: React.FC<SessionTreeProps> = ({ tree }) => {
           onToggleExpand={handleToggleExpand}
         />
       ))}
-    </List>
+      </List>
+    </Box>
   );
 };
