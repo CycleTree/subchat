@@ -10,9 +10,10 @@ import {
   Stack,
   CircularProgress,
   useMediaQuery,
-  useTheme
+  useTheme,
+  Snackbar
 } from '@mui/material';
-import { Send, Circle, ArrowBack } from '@mui/icons-material';
+import { Send, Circle, ArrowBack, ContentCopy } from '@mui/icons-material';
 import type { Session, Message } from '../../../shared/src/types';
 import { useAppStore } from '../store';
 
@@ -31,6 +32,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
 }) => {
   const [inputValue, setInputValue] = useState('');
   const [sending, setSending] = useState(false);
+  const [copySnackbarOpen, setCopySnackbarOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
   // Store and responsive setup
@@ -131,6 +133,15 @@ export const ChatView: React.FC<ChatViewProps> = ({
 
   const getMessageAlignment = (role: string) => {
     return role === 'user' ? 'flex-end' : 'flex-start';
+  };
+
+  const handleCopyMessage = async (content: string) => {
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopySnackbarOpen(true);
+    } catch (error) {
+      console.error('Failed to copy message:', error);
+    }
   };
 
   // Dynamic status text based on connection and queue state
@@ -294,15 +305,27 @@ export const ChatView: React.FC<ChatViewProps> = ({
                 </Paper>
                 
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
-                  <Chip 
-                    label={message.role} 
-                    size="small" 
+                  <Chip
+                    label={message.role}
+                    size="small"
                     color={getRoleColor(message.role) as any}
                     sx={{ fontSize: '0.7rem', height: 18 }}
                   />
                   <Typography variant="caption" color="text.secondary">
                     {formatTime(message.timestamp)}
                   </Typography>
+                  <IconButton
+                    size="small"
+                    onClick={() => handleCopyMessage(message.content)}
+                    sx={{
+                      p: 0.25,
+                      opacity: 0.6,
+                      '&:hover': { opacity: 1 }
+                    }}
+                    aria-label="Copy message"
+                  >
+                    <ContentCopy sx={{ fontSize: 14 }} />
+                  </IconButton>
                 </Box>
               </Box>
             ))}
@@ -359,6 +382,15 @@ export const ChatView: React.FC<ChatViewProps> = ({
           </Typography>
         </Box>
       </Box>
+
+      {/* Copy success feedback */}
+      <Snackbar
+        open={copySnackbarOpen}
+        autoHideDuration={2000}
+        onClose={() => setCopySnackbarOpen(false)}
+        message="Copied to clipboard"
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      />
     </Box>
   );
 };
