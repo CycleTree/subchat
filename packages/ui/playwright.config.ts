@@ -17,9 +17,13 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
-  webServer: {
-    command: 'npm run preview',
-    url: 'http://localhost:4173',
-    reuseExistingServer: !process.env.CI,
-  },
+  // CI では webServer を使わない (stub テストのため)
+  // 実テスト時は有効化する
+  ...(process.env.CI ? {} : {
+    webServer: {
+      command: 'npm run preview',
+      url: 'http://localhost:4173',
+      reuseExistingServer: true,
+    },
+  }),
 });
