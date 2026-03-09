@@ -13,6 +13,8 @@ export interface SessionTreeNode {
   session: Session;
   children: SessionTreeNode[];
   depth: number;
+  parentSessionId?: string;
+  hasMissingParent: boolean;
 }
 
 // localStorage keys for persistence
@@ -44,12 +46,16 @@ const getInitialViewMode = (): ViewMode => {
 function buildSessionTree(sessions: Session[]): SessionTreeNode[] {
   const sessionMap = new Map<string, Session>();
   const childrenMap = new Map<string, string[]>();
+  const normalizedSessions: Session[] = sessions.map((session) => ({
+    ...session,
+    childSessionIds: [],
+  }));
 
-  // Index sessions and compute childSessionIds
-  for (const session of sessions) {
+  for (const session of normalizedSessions) {
     sessionMap.set(session.id, session);
   }
-  for (const session of sessions) {
+
+  for (const session of normalizedSessions) {
     if (session.parentSessionId && sessionMap.has(session.parentSessionId)) {
       const children = childrenMap.get(session.parentSessionId) || [];
       children.push(session.id);
@@ -57,27 +63,66 @@ function buildSessionTree(sessions: Session[]): SessionTreeNode[] {
     }
   }
 
-  // Populate childSessionIds on each session
-  for (const session of sessions) {
+  const sortByLastActivity = (leftId: string, rightId: string) =>
+    (sessionMap.get(rightId)?.lastActivity.getTime() || 0) -
+    (sessionMap.get(leftId)?.lastActivity.getTime() || 0);
+
+  for (const [parentId, childIds] of childrenMap.entries()) {
+    childIds.sort(sortByLastActivity);
+    const session = sessionMap.get(parentId);
+    if (session) {
+      session.childSessionIds = childIds;
+    }
+  }
+
+  for (const session of normalizedSessions) {
+    if (!sessionMap.has(session.id)) {
+      continue;
+    }
     session.childSessionIds = childrenMap.get(session.id) || [];
   }
 
-  // Recursively build tree nodes
-  function buildNode(session: Session, depth: number): SessionTreeNode {
+  function buildNode(
+    session: Session,
+    depth: number,
+    lineage: Set<string>
+  ): SessionTreeNode {
+    if (lineage.has(session.id)) {
+      return {
+        session,
+        children: [],
+        depth,
+        parentSessionId: session.parentSessionId,
+        hasMissingParent: false,
+      };
+    }
+
+    const nextLineage = new Set(lineage);
+    nextLineage.add(session.id);
     const childIds = childrenMap.get(session.id) || [];
     const children = childIds
       .map(id => sessionMap.get(id)!)
       .filter(Boolean)
-      .map(child => buildNode(child, depth + 1));
-    return { session, children, depth };
+      .map(child => buildNode(child, depth + 1, nextLineage));
+
+    return {
+      session,
+      children,
+      depth,
+      parentSessionId: session.parentSessionId,
+      hasMissingParent: Boolean(
+        session.parentSessionId && !sessionMap.has(session.parentSessionId)
+      ),
+    };
   }
 
-  // Root nodes: sessions with no parent or whose parent doesn't exist
-  const roots = sessions.filter(
+  const roots = normalizedSessions
+    .filter(
     s => !s.parentSessionId || !sessionMap.has(s.parentSessionId)
-  );
+    )
+    .sort((left, right) => right.lastActivity.getTime() - left.lastActivity.getTime());
 
-  return roots.map(root => buildNode(root, 0));
+  return roots.map(root => buildNode(root, 0, new Set()));
 }
 
 interface AppStore {

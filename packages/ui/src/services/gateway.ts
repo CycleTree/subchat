@@ -1,27 +1,4 @@
-export interface Session {
-  id: string;
-  name: string;
-  agentId: string;
-  lastActivity: Date;
-  messageCount: number;
-  isActive: boolean;
-  parentSessionId?: string;
-  childSessionIds?: string[];
-}
-
-export interface Message {
-  id: string;
-  sessionId: string;
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-  timestamp: Date;
-  status?: string;
-}
-
-export interface ConnectionState {
-  isConnected: boolean;
-  isConnecting: boolean;
-}
+import type { Message, Session } from '../../../shared/src/types';
 
 export class OpenClawGateway {
   private ws: WebSocket | null = null;
@@ -168,12 +145,12 @@ export class OpenClawGateway {
     const sessions = response.sessions || [];
     return sessions.map((session: any, index: number) => ({
       id: session.key || `session-${index}`,
-      name: this.formatSessionName(session.key),
+      name: session.displayName || this.formatSessionName(session.key),
       agentId: this.extractAgent(session.key),
       lastActivity: new Date(session.updatedAt || Date.now()),
       messageCount: session.totalTokens || 0,
       isActive: session.isActive ?? true,
-      parentSessionId: session.parentSessionKey || session.spawner || undefined
+      parentSessionId: this.extractParentSessionId(session)
     }));
   }
 
@@ -283,6 +260,24 @@ export class OpenClawGateway {
         .join('\n');
     }
     return String(content);
+  }
+
+  private extractParentSessionId(session: any): string | undefined {
+    const parent = session.parentSessionKey || session.parent || session.spawner;
+
+    if (!parent) {
+      return undefined;
+    }
+
+    if (typeof parent === 'string') {
+      return parent;
+    }
+
+    if (typeof parent === 'object') {
+      return parent.key || parent.sessionKey || parent.id || undefined;
+    }
+
+    return undefined;
   }
 
   disconnect() {

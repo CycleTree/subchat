@@ -21,7 +21,7 @@ import {
   CircularProgress
 } from '@mui/material';
 import { Circle, SmartToy, Settings, DarkMode, LightMode, AccountTree, ViewList, Stop } from '@mui/icons-material';
-import type { Session } from '../services/gateway';
+import type { Session } from '../../../shared/src/types';
 import { useAppStore } from '../store';
 import { SessionTree } from './SessionTree';
 
@@ -33,6 +33,9 @@ interface SessionListProps {
 
 export const SessionList: React.FC<SessionListProps> = ({ sessions, onOpenSettings, onKillSession }) => {
   const { currentSessionId, setCurrentSession, themeMode, toggleTheme, viewMode, toggleViewMode, getSessionTree } = useAppStore();
+  const sessionTree = getSessionTree();
+  const rootSessionCount = sessionTree.length;
+  const spawnedSessionCount = Math.max(0, sessions.length - rootSessionCount);
 
   const [killTarget, setKillTarget] = useState<Session | null>(null);
   const [killing, setKilling] = useState(false);
@@ -99,7 +102,9 @@ export const SessionList: React.FC<SessionListProps> = ({ sessions, onOpenSettin
             SubChat v2.1.0
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            {sessions.length} sessions
+            {viewMode === 'tree'
+              ? `${rootSessionCount} roots • ${spawnedSessionCount} spawned`
+              : `${sessions.length} sessions`}
           </Typography>
         </Box>
         <Box sx={{ display: 'flex', gap: 0.5 }}>
@@ -137,7 +142,7 @@ export const SessionList: React.FC<SessionListProps> = ({ sessions, onOpenSettin
 
       {/* Session List */}
       {viewMode === 'tree' ? (
-        <SessionTree tree={getSessionTree()} />
+        <SessionTree tree={sessionTree} />
       ) : (
         <List sx={{ flexGrow: 1, overflow: 'auto', p: 0 }}>
           {sessions.map((session) => (

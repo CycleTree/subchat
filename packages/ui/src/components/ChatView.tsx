@@ -41,6 +41,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
   
   // Store and responsive setup
   const { 
+    sessions,
     clearCurrentSession, 
     saveDraft, 
     clearDraft, 
@@ -50,6 +51,9 @@ export const ChatView: React.FC<ChatViewProps> = ({
   } = useAppStore();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const parentSession = session?.parentSessionId
+    ? sessions.find((item) => item.id === session.parentSessionId) || null
+    : null;
   
   // Auto scroll to bottom
   useEffect(() => {
@@ -228,8 +232,15 @@ export const ChatView: React.FC<ChatViewProps> = ({
             <Typography variant="h6" component="h1" sx={{ fontWeight: 600 }}>
               {session.name}
             </Typography>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5, flexWrap: 'wrap' }}>
               <Chip label={session.agentId} size="small" color="primary" variant="outlined" />
+              {parentSession && (
+                <Chip
+                  label={`spawned from ${parentSession.name}`}
+                  size="small"
+                  variant="outlined"
+                />
+              )}
               <Typography variant="caption" color="text.secondary">
                 {messages.length} messages
               </Typography>
