@@ -12,6 +12,7 @@ interface AppStore {
   // Actions
   setSessions: (sessions: Session[]) => void;
   setCurrentSession: (sessionId: string) => void;
+  clearCurrentSession: () => void;
   addMessage: (message: Message) => void;
   updateMessage: (messageId: string, updates: Partial<Message>) => void;
   setConnection: (connection: ConnectionState) => void;
@@ -35,6 +36,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
   setSessions: (sessions) => set({ sessions }),
   
   setCurrentSession: (sessionId) => set({ currentSessionId: sessionId }),
+  
+  clearCurrentSession: () => set({ currentSessionId: null }),
   
   addMessage: (message) => set((state) => {
     const sessionMessages = state.messages[message.sessionId] || [];

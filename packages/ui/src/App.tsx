@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
-import { CssBaseline, Alert, Box } from '@mui/material';
+import { CssBaseline, Alert, Box, useMediaQuery } from '@mui/material';
 import { useAppStore } from './store';
 import { OpenClawGateway } from './services/gateway';
 import { SessionList } from './components/SessionList';
@@ -228,6 +228,14 @@ function App() {
 
   const currentSession = sessions.find(s => s.id === currentSessionId) || null;
   const currentMessages = getCurrentMessages();
+  
+  // Responsive breakpoint detection
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  
+  // On mobile: show SessionList when no session selected, show ChatView when session selected
+  // On desktop: show both side by side
+  const showSessionList = !isMobile || !currentSessionId;
+  const showChatView = !isMobile || currentSessionId;
 
   return (
     <ThemeProvider theme={theme}>
@@ -263,17 +271,21 @@ function App() {
           </Alert>
         )}
         
-        <SessionList 
-          sessions={sessions} 
-          onOpenSettings={() => setSettingsOpen(true)}
-        />
+        {showSessionList && (
+          <SessionList 
+            sessions={sessions} 
+            onOpenSettings={() => setSettingsOpen(true)}
+          />
+        )}
         
-        <ChatView 
-          session={currentSession}
-          messages={currentMessages}
-          onSendMessage={handleSendMessage}
-          isConnected={connection.isConnected}
-        />
+        {showChatView && (
+          <ChatView 
+            session={currentSession}
+            messages={currentMessages}
+            onSendMessage={handleSendMessage}
+            isConnected={connection.isConnected}
+          />
+        )}
 
         <SettingsDialog
           open={settingsOpen}

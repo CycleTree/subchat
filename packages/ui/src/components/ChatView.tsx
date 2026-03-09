@@ -7,12 +7,14 @@ import {
   TextField,
   IconButton,
   Chip,
-
   Stack,
-  CircularProgress
+  CircularProgress,
+  useMediaQuery,
+  useTheme
 } from '@mui/material';
-import { Send, Circle } from '@mui/icons-material';
+import { Send, Circle, ArrowBack } from '@mui/icons-material';
 import type { Session, Message } from '../../../shared/src/types';
+import { useAppStore } from '../store';
 
 interface ChatViewProps {
   session: Session | null;
@@ -30,6 +32,11 @@ export const ChatView: React.FC<ChatViewProps> = ({
   const [inputValue, setInputValue] = useState('');
   const [sending, setSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  // Store and responsive setup
+  const { clearCurrentSession } = useAppStore();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   
   // Auto scroll to bottom
   useEffect(() => {
@@ -110,15 +117,29 @@ export const ChatView: React.FC<ChatViewProps> = ({
           justifyContent: 'space-between'
         }}
       >
-        <Box>
-          <Typography variant="h6" component="h1" sx={{ fontWeight: 600 }}>
-            {session.name}
-          </Typography>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
-            <Chip label={session.agentId} size="small" color="primary" variant="outlined" />
-            <Typography variant="caption" color="text.secondary">
-              {messages.length} messages
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          {/* Back button for mobile */}
+          {isMobile && (
+            <IconButton
+              onClick={clearCurrentSession}
+              size="small"
+              sx={{ mr: 1 }}
+              aria-label="Back to sessions"
+            >
+              <ArrowBack />
+            </IconButton>
+          )}
+          
+          <Box>
+            <Typography variant="h6" component="h1" sx={{ fontWeight: 600 }}>
+              {session.name}
             </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+              <Chip label={session.agentId} size="small" color="primary" variant="outlined" />
+              <Typography variant="caption" color="text.secondary">
+                {messages.length} messages
+              </Typography>
+            </Box>
           </Box>
         </Box>
         
