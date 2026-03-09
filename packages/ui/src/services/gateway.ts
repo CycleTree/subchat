@@ -23,6 +23,19 @@ export interface ConnectionState {
   isConnecting: boolean;
 }
 
+export interface ChatEventPayload {
+  runId: string;
+  sessionKey: string;
+  seq: number;
+  state: 'delta' | 'final' | 'error';
+  message?: {
+    role?: 'user' | 'assistant' | 'system';
+    content?: any;
+    timestamp?: number;
+  };
+  errorMessage?: string;
+}
+
 export class OpenClawGateway {
   private ws: WebSocket | null = null;
   private requestId = 0;
@@ -32,6 +45,7 @@ export class OpenClawGateway {
   private authToken = '';
   
   public onConnectionChange?: (isConnected: boolean) => void;
+  public onChatEvent?: (payload: ChatEventPayload) => void;
 
   async connect(gatewayUrl: string, token: string): Promise<any> {
     return new Promise((resolve, reject) => {
@@ -76,6 +90,11 @@ export class OpenClawGateway {
     if (message.type === 'event' && message.event === 'connect.challenge') {
       console.log('🔐 Auth challenge received');
       this.authenticate();
+      return;
+    }
+
+    if (message.type === 'event' && message.event === 'chat') {
+      this.onChatEvent?.(message.payload as ChatEventPayload);
       return;
     }
     
@@ -202,6 +221,36 @@ export class OpenClawGateway {
     console.log('✅ Message sent successfully');
   }
 
+  async sendIntervention(sessionKey: string, content: string): Promise<{ idempotencyKey: string; transport: 'sessions_send' | 'chat.send' }> {
+    const idempotencyKey = `subchat-intervention-${Date.now()}-${Math.random().toString(36).substring(2)}`;
+
+    try {
+      await this.request('sessions_send', {
+        sessionKey,
+        message: content,
+        idempotencyKey
+      });
+
+      console.log('✅ Intervention sent via sessions_send');
+      return { idempotencyKey, transport: 'sessions_send' };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+
+      if (!message.includes('Unknown method') && !message.includes('not found') && !message.includes('invalid method')) {
+        throw error;
+      }
+
+      await this.request('chat.send', {
+        sessionKey,
+        message: content,
+        idempotencyKey
+      });
+
+      console.log('✅ Intervention sent via chat.send fallback');
+      return { idempotencyKey, transport: 'chat.send' };
+    }
+  }
+
   async killSession(sessionKey: string): Promise<void> {
     const isDevelopment = typeof window !== 'undefined' && window.location.hostname === 'localhost';
     const baseUrl = isDevelopment
@@ -276,6 +325,7 @@ export class OpenClawGateway {
 
   private extractContent(content: any): string {
     if (typeof content === 'string') return content;
+    if (content?.type === 'text' && typeof content.text === 'string') return content.text;
     if (Array.isArray(content)) {
       return content
         .filter(item => item?.type === 'text')

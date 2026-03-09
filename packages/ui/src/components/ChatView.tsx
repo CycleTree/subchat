@@ -12,9 +12,11 @@ import {
   useMediaQuery,
   useTheme,
   Snackbar,
-  Button
+  Button,
+  Alert,
+  Divider
 } from '@mui/material';
-import { Send, Circle, ArrowBack, ContentCopy, ExpandMore, ExpandLess } from '@mui/icons-material';
+import { Send, Circle, ArrowBack, ContentCopy, ExpandMore, ExpandLess, Psychology } from '@mui/icons-material';
 import type { Session, Message } from '../../../shared/src/types';
 import { useAppStore } from '../store';
 
@@ -24,6 +26,7 @@ interface ChatViewProps {
   session: Session | null;
   messages: Message[];
   onSendMessage: (content: string) => Promise<void>;
+  onSendIntervention: (content: string) => Promise<void>;
   isConnected: boolean;
 }
 
@@ -31,11 +34,14 @@ export const ChatView: React.FC<ChatViewProps> = ({
   session,
   messages,
   onSendMessage,
+  onSendIntervention,
   isConnected
 }) => {
   const [inputValue, setInputValue] = useState('');
   const [sending, setSending] = useState(false);
+  const [sendingIntervention, setSendingIntervention] = useState(false);
   const [copySnackbarOpen, setCopySnackbarOpen] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [expandedMessages, setExpandedMessages] = useState<Set<string>>(new Set());
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
@@ -46,7 +52,8 @@ export const ChatView: React.FC<ChatViewProps> = ({
     clearDraft, 
     getDraft, 
     queueMessage,
-    getSessionQueuedCount
+    getSessionQueuedCount,
+    getSessionInterventions
   } = useAppStore();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
@@ -82,7 +89,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
   };
 
   const handleSend = async () => {
-    if (!inputValue.trim() || sending || !session) return;
+    if (!inputValue.trim() || sending || sendingIntervention || !session) return;
 
     const messageContent = inputValue.trim();
     
@@ -104,10 +111,28 @@ export const ChatView: React.FC<ChatViewProps> = ({
       console.log('✅ Message sent immediately:', messageContent);
     } catch (error) {
       console.error('❌ Failed to send message:', error);
-      // On send failure, could re-queue or show error
-      // For now, let the UI handle the error display
+      setActionError(error instanceof Error ? error.message : 'Failed to send message');
     } finally {
       setSending(false);
+    }
+  };
+
+  const handleIntervention = async () => {
+    if (!inputValue.trim() || sending || sendingIntervention || !session) return;
+
+    const interventionContent = inputValue.trim();
+    setInputValue('');
+    clearDraft(session.id);
+    setSendingIntervention(true);
+
+    try {
+      await onSendIntervention(interventionContent);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'Failed to send intervention');
+      setInputValue(interventionContent);
+      saveDraft(session.id, interventionContent);
+    } finally {
+      setSendingIntervention(false);
     }
   };
 
@@ -163,6 +188,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
   // Dynamic status text based on connection and queue state
   const getStatusText = () => {
     if (sending) return "Sending...";
+    if (sendingIntervention) return "Sending intervention...";
     if (!isConnected) {
       const queuedCount = session ? getSessionQueuedCount(session.id) : 0;
       if (queuedCount > 0) {
@@ -196,6 +222,10 @@ export const ChatView: React.FC<ChatViewProps> = ({
       </Box>
     );
   }
+
+  const interventions = getSessionInterventions(session.id)
+    .slice()
+    .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
 
   return (
     <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', height: '100vh' }}>
@@ -259,6 +289,49 @@ export const ChatView: React.FC<ChatViewProps> = ({
           bgcolor: 'grey.50'
         }}
       >
+        <Paper
+          elevation={0}
+          sx={{
+            mb: 2,
+            p: 1.5,
+            border: 1,
+            borderColor: 'divider',
+            bgcolor: 'background.paper'
+          }}
+        >
+          <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
+            Intervention History
+          </Typography>
+          {interventions.length === 0 ? (
+            <Typography variant="body2" color="text.secondary">
+              No interventions yet.
+            </Typography>
+          ) : (
+            <Stack spacing={1}>
+              {interventions.map((entry) => (
+                <Box key={entry.id}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                    <Chip
+                      label={entry.status}
+                      size="small"
+                      color={entry.status === 'failed' ? 'error' : entry.status === 'sent' ? 'success' : 'warning'}
+                      variant="outlined"
+                      sx={{ height: 20 }}
+                    />
+                    <Typography variant="caption" color="text.secondary">
+                      {formatTime(entry.timestamp)}
+                    </Typography>
+                  </Box>
+                  <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+                    {entry.content}
+                  </Typography>
+                  <Divider sx={{ mt: 1 }} />
+                </Box>
+              ))}
+            </Stack>
+          )}
+        </Paper>
+
         {messages.length === 0 ? (
           <Box 
             sx={{ 
@@ -390,7 +463,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
             value={inputValue}
             onChange={handleInputChange}
             onKeyPress={handleKeyPress}
-            disabled={sending}
+            disabled={sending || sendingIntervention}
             size="small"
             error={!isConnected && !sending}
             helperText={!isConnected ? "Offline mode - messages will be queued" : ""}
@@ -407,14 +480,29 @@ export const ChatView: React.FC<ChatViewProps> = ({
           />
           <IconButton
             onClick={handleSend}
-            disabled={!inputValue.trim() || sending}
+            disabled={!inputValue.trim() || sending || sendingIntervention}
             color={!isConnected ? "warning" : "primary"}
             sx={{ mb: 0.5 }}
             title={!isConnected ? "Message will be queued" : "Send message"}
           >
             {sending ? <CircularProgress size={20} /> : <Send />}
           </IconButton>
+          <IconButton
+            onClick={handleIntervention}
+            disabled={!inputValue.trim() || sending || sendingIntervention || !isConnected}
+            color="secondary"
+            sx={{ mb: 0.5 }}
+            title={isConnected ? "Send intervention to this session" : "Interventions require a live connection"}
+          >
+            {sendingIntervention ? <CircularProgress size={20} /> : <Psychology />}
+          </IconButton>
         </Box>
+
+        {actionError && (
+          <Alert severity="error" sx={{ mt: 1 }} onClose={() => setActionError(null)}>
+            {actionError}
+          </Alert>
+        )}
         
         {/* Status bar */}
         <Box sx={{ mt: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

@@ -11,6 +11,20 @@ import { testGateway } from './utils/websocketTest';
 
 const gateway = new OpenClawGateway();
 
+const extractGatewayContent = (content: unknown): string => {
+  if (typeof content === 'string') return content;
+  if (Array.isArray(content)) {
+    return content
+      .filter((item: any) => item?.type === 'text')
+      .map((item: any) => item.text)
+      .join('\n');
+  }
+  if (content && typeof content === 'object' && (content as any).type === 'text') {
+    return typeof (content as any).text === 'string' ? (content as any).text : '';
+  }
+  return String(content ?? '');
+};
+
 // Development tools
 if (typeof window !== "undefined" && window.location.hostname === "localhost") {
   (window as any).testGateway = testGateway;
@@ -28,10 +42,13 @@ function App() {
     themeMode,
     setSessions,
     addMessage,
+    updateMessage,
     setConnection,
     getCurrentMessages,
     queuedMessages,
-    removeQueuedMessage
+    removeQueuedMessage,
+    addIntervention,
+    updateIntervention
   } = useAppStore();
 
   const [initError, setInitError] = useState<string | null>(null);
@@ -155,6 +172,45 @@ function App() {
       gateway.disconnect();
     };
   }, [setConnection, setSessions]); // Only depend on these, not on token changes
+
+  useEffect(() => {
+    gateway.onChatEvent = (payload) => {
+      if (!payload.sessionKey) return;
+
+      if (payload.state === 'error') {
+        updateMessage(payload.runId, {
+          status: 'failed'
+        });
+        return;
+      }
+
+      if (!payload.message) return;
+
+      const content = extractGatewayContent(payload.message.content);
+      const timestamp = new Date(payload.message.timestamp || Date.now());
+
+      addMessage({
+        id: payload.runId,
+        sessionId: payload.sessionKey,
+        role: payload.message.role || 'assistant',
+        content,
+        timestamp,
+        status: payload.state === 'delta' ? 'pending' : 'sent'
+      });
+
+      if (payload.state === 'final') {
+        updateMessage(payload.runId, {
+          content,
+          timestamp,
+          status: 'sent'
+        });
+      }
+    };
+
+    return () => {
+      gateway.onChatEvent = undefined;
+    };
+  }, [addMessage, updateMessage]);
 
   useEffect(() => {
     const loadMessages = async () => {
@@ -294,6 +350,32 @@ function App() {
     }
   };
 
+  const handleSendIntervention = async (content: string): Promise<void> => {
+    if (!currentSessionId || !connection.isConnected) {
+      throw new Error('Not connected or no session selected');
+    }
+
+    const interventionId = `intervention-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+    addIntervention({
+      id: interventionId,
+      sessionId: currentSessionId,
+      content,
+      timestamp: new Date(),
+      status: 'pending'
+    });
+
+    try {
+      await gateway.sendIntervention(currentSessionId, content);
+      updateIntervention(interventionId, { status: 'sent' });
+      console.log('✅ Intervention sent:', content);
+    } catch (error) {
+      updateIntervention(interventionId, { status: 'failed' });
+      console.error('❌ Failed to send intervention:', error);
+      throw error;
+    }
+  };
+
   const currentSession = sessions.find(s => s.id === currentSessionId) || null;
   const currentMessages = getCurrentMessages();
   
@@ -358,6 +440,7 @@ function App() {
             session={currentSession}
             messages={allMessages}
             onSendMessage={handleSendMessage}
+            onSendIntervention={handleSendIntervention}
             isConnected={connection.isConnected}
           />
         )}

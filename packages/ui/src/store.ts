@@ -15,6 +15,14 @@ export interface SessionTreeNode {
   depth: number;
 }
 
+export interface InterventionEntry {
+  id: string;
+  sessionId: string;
+  content: string;
+  timestamp: Date;
+  status: 'pending' | 'sent' | 'failed';
+}
+
 // localStorage keys for persistence
 const THEME_STORAGE_KEY = 'subchat_theme_mode';
 const VIEW_MODE_STORAGE_KEY = 'subchat_view_mode';
@@ -88,6 +96,7 @@ interface AppStore {
   connection: ConnectionState;
   drafts: Record<string, string>;
   queuedMessages: QueuedMessage[];
+  interventions: Record<string, InterventionEntry[]>;
   themeMode: ThemeMode;
   viewMode: ViewMode;
 
@@ -119,6 +128,11 @@ interface AppStore {
   removeQueuedMessage: (messageId: string) => void;
   getQueuedCount: () => number;
   getSessionQueuedCount: (sessionId: string) => number;
+
+  // Intervention actions
+  addIntervention: (entry: InterventionEntry) => void;
+  updateIntervention: (entryId: string, updates: Partial<InterventionEntry>) => void;
+  getSessionInterventions: (sessionId: string) => InterventionEntry[];
   
   // Computed
   getCurrentMessages: () => Message[];
@@ -136,6 +150,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
   },
   drafts: {},
   queuedMessages: [],
+  interventions: {},
   themeMode: getInitialTheme(),
   viewMode: getInitialViewMode(),
   
@@ -148,6 +163,20 @@ export const useAppStore = create<AppStore>((set, get) => ({
   
   addMessage: (message) => set((state) => {
     const sessionMessages = state.messages[message.sessionId] || [];
+    const existingIndex = sessionMessages.findIndex((entry) => entry.id === message.id);
+
+    if (existingIndex >= 0) {
+      const nextMessages = [...sessionMessages];
+      nextMessages[existingIndex] = { ...nextMessages[existingIndex], ...message };
+
+      return {
+        messages: {
+          ...state.messages,
+          [message.sessionId]: nextMessages
+        }
+      };
+    }
+
     return {
       messages: {
         ...state.messages,
@@ -241,6 +270,47 @@ export const useAppStore = create<AppStore>((set, get) => ({
   getSessionQueuedCount: (sessionId) => {
     const state = get();
     return state.queuedMessages.filter(msg => msg.sessionId === sessionId).length;
+  },
+
+  addIntervention: (entry) => set((state) => {
+    const sessionEntries = state.interventions[entry.sessionId] || [];
+    const existingIndex = sessionEntries.findIndex((item) => item.id === entry.id);
+
+    if (existingIndex >= 0) {
+      const nextEntries = [...sessionEntries];
+      nextEntries[existingIndex] = { ...nextEntries[existingIndex], ...entry };
+
+      return {
+        interventions: {
+          ...state.interventions,
+          [entry.sessionId]: nextEntries
+        }
+      };
+    }
+
+    return {
+      interventions: {
+        ...state.interventions,
+        [entry.sessionId]: [...sessionEntries, entry]
+      }
+    };
+  }),
+
+  updateIntervention: (entryId, updates) => set((state) => {
+    const nextInterventions = { ...state.interventions };
+
+    Object.keys(nextInterventions).forEach((sessionId) => {
+      nextInterventions[sessionId] = nextInterventions[sessionId].map((entry) =>
+        entry.id === entryId ? { ...entry, ...updates } : entry
+      );
+    });
+
+    return { interventions: nextInterventions };
+  }),
+
+  getSessionInterventions: (sessionId) => {
+    const state = get();
+    return state.interventions[sessionId] || [];
   },
   
   // Computed getters
