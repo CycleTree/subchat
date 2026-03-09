@@ -5,6 +5,8 @@ export interface Session {
   lastActivity: Date;
   messageCount: number;
   isActive: boolean;
+  parentSessionId?: string;
+  childSessionIds?: string[];
 }
 
 export interface Message {
@@ -170,7 +172,8 @@ export class OpenClawGateway {
       agentId: this.extractAgent(session.key),
       lastActivity: new Date(session.updatedAt || Date.now()),
       messageCount: session.totalTokens || 0,
-      isActive: session.isActive ?? true
+      isActive: session.isActive ?? true,
+      parentSessionId: session.parentSessionKey || session.spawner || undefined
     }));
   }
 

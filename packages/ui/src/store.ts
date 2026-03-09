@@ -5,8 +5,19 @@ import type { Session, Message, ConnectionState, QueuedMessage } from '../../sha
 // Theme mode type
 export type ThemeMode = 'light' | 'dark';
 
-// localStorage key for theme persistence
+// View mode type
+export type ViewMode = 'flat' | 'tree';
+
+// Tree node for hierarchical session display
+export interface SessionTreeNode {
+  session: Session;
+  children: SessionTreeNode[];
+  depth: number;
+}
+
+// localStorage keys for persistence
 const THEME_STORAGE_KEY = 'subchat_theme_mode';
+const VIEW_MODE_STORAGE_KEY = 'subchat_view_mode';
 
 // Get initial theme from localStorage or system preference
 const getInitialTheme = (): ThemeMode => {
@@ -21,6 +32,54 @@ const getInitialTheme = (): ThemeMode => {
   return 'light';
 };
 
+const getInitialViewMode = (): ViewMode => {
+  const stored = localStorage.getItem(VIEW_MODE_STORAGE_KEY);
+  if (stored === 'flat' || stored === 'tree') {
+    return stored;
+  }
+  return 'flat';
+};
+
+// Build session tree from flat session list
+function buildSessionTree(sessions: Session[]): SessionTreeNode[] {
+  const sessionMap = new Map<string, Session>();
+  const childrenMap = new Map<string, string[]>();
+
+  // Index sessions and compute childSessionIds
+  for (const session of sessions) {
+    sessionMap.set(session.id, session);
+  }
+  for (const session of sessions) {
+    if (session.parentSessionId && sessionMap.has(session.parentSessionId)) {
+      const children = childrenMap.get(session.parentSessionId) || [];
+      children.push(session.id);
+      childrenMap.set(session.parentSessionId, children);
+    }
+  }
+
+  // Populate childSessionIds on each session
+  for (const session of sessions) {
+    session.childSessionIds = childrenMap.get(session.id) || [];
+  }
+
+  // Recursively build tree nodes
+  function buildNode(session: Session, depth: number): SessionTreeNode {
+    const childIds = childrenMap.get(session.id) || [];
+    const children = childIds
+      .map(id => sessionMap.get(id)!)
+      .filter(Boolean)
+      .map(child => buildNode(child, depth + 1));
+    return { session, children, depth };
+  }
+
+  // Root nodes: sessions with no parent or whose parent doesn't exist
+  const roots = sessions.filter(
+    s => !s.parentSessionId || !sessionMap.has(s.parentSessionId)
+  );
+
+  return roots.map(root => buildNode(root, 0));
+}
+
 interface AppStore {
   // State
   sessions: Session[];
@@ -30,7 +89,8 @@ interface AppStore {
   drafts: Record<string, string>;
   queuedMessages: QueuedMessage[];
   themeMode: ThemeMode;
-  
+  viewMode: ViewMode;
+
   // Actions
   setSessions: (sessions: Session[]) => void;
   setCurrentSession: (sessionId: string) => void;
@@ -42,6 +102,12 @@ interface AppStore {
   // Theme actions
   setThemeMode: (mode: ThemeMode) => void;
   toggleTheme: () => void;
+
+  // View mode actions
+  toggleViewMode: () => void;
+
+  // Tree computed
+  getSessionTree: () => SessionTreeNode[];
   
   // Draft actions
   saveDraft: (sessionId: string, content: string) => void;
@@ -71,6 +137,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
   drafts: {},
   queuedMessages: [],
   themeMode: getInitialTheme(),
+  viewMode: getInitialViewMode(),
   
   // Actions
   setSessions: (sessions) => set({ sessions }),
@@ -113,7 +180,21 @@ export const useAppStore = create<AppStore>((set, get) => ({
     localStorage.setItem(THEME_STORAGE_KEY, newMode);
     set({ themeMode: newMode });
   },
-  
+
+  // View mode actions
+  toggleViewMode: () => {
+    const state = get();
+    const newMode = state.viewMode === 'flat' ? 'tree' : 'flat';
+    localStorage.setItem(VIEW_MODE_STORAGE_KEY, newMode);
+    set({ viewMode: newMode });
+  },
+
+  // Tree computed
+  getSessionTree: () => {
+    const state = get();
+    return buildSessionTree(state.sessions);
+  },
+
   // Draft actions
   saveDraft: (sessionId, content) => set((state) => ({
     drafts: { ...state.drafts, [sessionId]: content }

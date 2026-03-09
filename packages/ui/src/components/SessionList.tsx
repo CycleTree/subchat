@@ -11,9 +11,10 @@ import {
   IconButton,
   Tooltip
 } from '@mui/material';
-import { Circle, SmartToy, Settings, DarkMode, LightMode } from '@mui/icons-material';
+import { Circle, SmartToy, Settings, DarkMode, LightMode, AccountTree, ViewList } from '@mui/icons-material';
 import type { Session } from '../services/gateway';
 import { useAppStore } from '../store';
+import { SessionTree } from './SessionTree';
 
 interface SessionListProps {
   sessions: Session[];
@@ -21,7 +22,7 @@ interface SessionListProps {
 }
 
 export const SessionList: React.FC<SessionListProps> = ({ sessions, onOpenSettings }) => {
-  const { currentSessionId, setCurrentSession, themeMode, toggleTheme } = useAppStore();
+  const { currentSessionId, setCurrentSession, themeMode, toggleTheme, viewMode, toggleViewMode, getSessionTree } = useAppStore();
 
   const formatTime = (date: Date) => {
     const now = new Date();
@@ -62,8 +63,18 @@ export const SessionList: React.FC<SessionListProps> = ({ sessions, onOpenSettin
           </Typography>
         </Box>
         <Box sx={{ display: 'flex', gap: 0.5 }}>
+          <Tooltip title={viewMode === 'flat' ? 'ツリー表示' : 'リスト表示'}>
+            <IconButton
+              onClick={toggleViewMode}
+              size="small"
+              sx={{ color: 'text.secondary' }}
+              aria-label="toggle view mode"
+            >
+              {viewMode === 'flat' ? <AccountTree /> : <ViewList />}
+            </IconButton>
+          </Tooltip>
           <Tooltip title={themeMode === 'light' ? 'ダークモード' : 'ライトモード'}>
-            <IconButton 
+            <IconButton
               onClick={toggleTheme}
               size="small"
               sx={{ color: 'text.secondary' }}
@@ -85,91 +96,95 @@ export const SessionList: React.FC<SessionListProps> = ({ sessions, onOpenSettin
       </Box>
 
       {/* Session List */}
-      <List sx={{ flexGrow: 1, overflow: 'auto', p: 0 }}>
-        {sessions.map((session) => (
-          <ListItemButton
-            key={session.id}
-            selected={session.id === currentSessionId}
-            onClick={() => setCurrentSession(session.id)}
-            sx={{
-              py: 1.5,
-              px: 2,
-              borderBottom: 1,
-              borderColor: 'divider',
-              '&.Mui-selected': {
-                backgroundColor: 'primary.light',
-                borderRight: 3,
-                borderRightColor: 'primary.main',
-                '&:hover': {
+      {viewMode === 'tree' ? (
+        <SessionTree tree={getSessionTree()} />
+      ) : (
+        <List sx={{ flexGrow: 1, overflow: 'auto', p: 0 }}>
+          {sessions.map((session) => (
+            <ListItemButton
+              key={session.id}
+              selected={session.id === currentSessionId}
+              onClick={() => setCurrentSession(session.id)}
+              sx={{
+                py: 1.5,
+                px: 2,
+                borderBottom: 1,
+                borderColor: 'divider',
+                '&.Mui-selected': {
                   backgroundColor: 'primary.light',
+                  borderRight: 3,
+                  borderRightColor: 'primary.main',
+                  '&:hover': {
+                    backgroundColor: 'primary.light',
+                  },
                 },
-              },
-            }}
-          >
-            <ListItemIcon sx={{ minWidth: 40 }}>
-              <SmartToy 
-                color={session.isActive ? 'primary' : 'disabled'} 
-                fontSize="small" 
-              />
-            </ListItemIcon>
-            
-            <Box sx={{ flexGrow: 1 }}>
-              {/* Session Name Row */}
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Typography variant="body2" noWrap sx={{ fontWeight: 500, flexGrow: 1 }}>
-                  {session.name}
-                </Typography>
-                {session.isActive && (
-                  <Circle sx={{ fontSize: 8, color: 'success.main' }} />
-                )}
-              </Box>
-              
-              {/* Agent & Time Row */}
-              <Box sx={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'space-between', 
-                mt: 0.5,
-                gap: 1
-              }}>
-                <Chip
-                  label={session.agentId}
-                  size="small"
-                  variant="outlined"
-                  sx={{ 
-                    fontSize: '0.7rem', 
-                    height: 20,
-                    '& .MuiChip-label': {
-                      px: 1
-                    }
-                  }}
+              }}
+            >
+              <ListItemIcon sx={{ minWidth: 40 }}>
+                <SmartToy
+                  color={session.isActive ? 'primary' : 'disabled'}
+                  fontSize="small"
                 />
-                <Typography variant="caption" color="text.secondary">
-                  {formatTime(session.lastActivity)}
-                </Typography>
-              </Box>
-            </Box>
-            
-            {session.messageCount > 0 && (
-              <Badge
-                badgeContent={session.messageCount > 99 ? '99+' : session.messageCount}
-                color="primary"
-                sx={{ ml: 1 }}
-              >
-                <Box />
-              </Badge>
-            )}
-          </ListItemButton>
-        ))}
+              </ListItemIcon>
 
-        {sessions.length === 0 && (
-          <Box sx={{ p: 4, textAlign: 'center' }}>
-            <Typography variant="body2" color="text.secondary">
-              No active sessions
-            </Typography>
-          </Box>
-        )}
-      </List>
+              <Box sx={{ flexGrow: 1 }}>
+                {/* Session Name Row */}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Typography variant="body2" noWrap sx={{ fontWeight: 500, flexGrow: 1 }}>
+                    {session.name}
+                  </Typography>
+                  {session.isActive && (
+                    <Circle sx={{ fontSize: 8, color: 'success.main' }} />
+                  )}
+                </Box>
+
+                {/* Agent & Time Row */}
+                <Box sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  mt: 0.5,
+                  gap: 1
+                }}>
+                  <Chip
+                    label={session.agentId}
+                    size="small"
+                    variant="outlined"
+                    sx={{
+                      fontSize: '0.7rem',
+                      height: 20,
+                      '& .MuiChip-label': {
+                        px: 1
+                      }
+                    }}
+                  />
+                  <Typography variant="caption" color="text.secondary">
+                    {formatTime(session.lastActivity)}
+                  </Typography>
+                </Box>
+              </Box>
+
+              {session.messageCount > 0 && (
+                <Badge
+                  badgeContent={session.messageCount > 99 ? '99+' : session.messageCount}
+                  color="primary"
+                  sx={{ ml: 1 }}
+                >
+                  <Box />
+                </Badge>
+              )}
+            </ListItemButton>
+          ))}
+
+          {sessions.length === 0 && (
+            <Box sx={{ p: 4, textAlign: 'center' }}>
+              <Typography variant="body2" color="text.secondary">
+                No active sessions
+              </Typography>
+            </Box>
+          )}
+        </List>
+      )}
 
       {/* Footer */}
       <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
