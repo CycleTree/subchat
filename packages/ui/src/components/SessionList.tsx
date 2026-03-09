@@ -8,9 +8,10 @@ import {
   Box,
   Badge,
   Chip,
-  IconButton
+  IconButton,
+  Tooltip
 } from '@mui/material';
-import { Circle, SmartToy, Settings } from '@mui/icons-material';
+import { Circle, SmartToy, Settings, DarkMode, LightMode } from '@mui/icons-material';
 import type { Session } from '../services/gateway';
 import { useAppStore } from '../store';
 
@@ -20,7 +21,7 @@ interface SessionListProps {
 }
 
 export const SessionList: React.FC<SessionListProps> = ({ sessions, onOpenSettings }) => {
-  const { currentSessionId, setCurrentSession } = useAppStore();
+  const { currentSessionId, setCurrentSession, themeMode, toggleTheme } = useAppStore();
 
   const formatTime = (date: Date) => {
     const now = new Date();
@@ -36,7 +37,13 @@ export const SessionList: React.FC<SessionListProps> = ({ sessions, onOpenSettin
   };
 
   return (
-    <Box sx={{ width: 320, height: '100vh', borderRight: 1, borderColor: 'divider' }}>
+    <Box sx={{ 
+      width: 320, 
+      height: '100vh', 
+      borderRight: 1, 
+      borderColor: 'divider',
+      bgcolor: 'background.paper'
+    }}>
       {/* Header */}
       <Box sx={{ 
         p: 2, 
@@ -54,13 +61,27 @@ export const SessionList: React.FC<SessionListProps> = ({ sessions, onOpenSettin
             {sessions.length} sessions
           </Typography>
         </Box>
-        <IconButton 
-          onClick={onOpenSettings}
-          size="small"
-          sx={{ color: 'text.secondary' }}
-        >
-          <Settings />
-        </IconButton>
+        <Box sx={{ display: 'flex', gap: 0.5 }}>
+          <Tooltip title={themeMode === 'light' ? 'ダークモード' : 'ライトモード'}>
+            <IconButton 
+              onClick={toggleTheme}
+              size="small"
+              sx={{ color: 'text.secondary' }}
+              aria-label="toggle theme"
+            >
+              {themeMode === 'light' ? <DarkMode /> : <LightMode />}
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="設定">
+            <IconButton 
+              onClick={onOpenSettings}
+              size="small"
+              sx={{ color: 'text.secondary' }}
+            >
+              <Settings />
+            </IconButton>
+          </Tooltip>
+        </Box>
       </Box>
 
       {/* Session List */}

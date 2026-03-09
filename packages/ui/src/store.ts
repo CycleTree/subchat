@@ -2,6 +2,25 @@
 import { create } from 'zustand';
 import type { Session, Message, ConnectionState, QueuedMessage } from '../../shared/src/types';
 
+// Theme mode type
+export type ThemeMode = 'light' | 'dark';
+
+// localStorage key for theme persistence
+const THEME_STORAGE_KEY = 'subchat_theme_mode';
+
+// Get initial theme from localStorage or system preference
+const getInitialTheme = (): ThemeMode => {
+  const stored = localStorage.getItem(THEME_STORAGE_KEY);
+  if (stored === 'light' || stored === 'dark') {
+    return stored;
+  }
+  // Default to system preference
+  if (typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    return 'dark';
+  }
+  return 'light';
+};
+
 interface AppStore {
   // State
   sessions: Session[];
@@ -10,6 +29,7 @@ interface AppStore {
   connection: ConnectionState;
   drafts: Record<string, string>;
   queuedMessages: QueuedMessage[];
+  themeMode: ThemeMode;
   
   // Actions
   setSessions: (sessions: Session[]) => void;
@@ -18,6 +38,10 @@ interface AppStore {
   addMessage: (message: Message) => void;
   updateMessage: (messageId: string, updates: Partial<Message>) => void;
   setConnection: (connection: ConnectionState) => void;
+  
+  // Theme actions
+  setThemeMode: (mode: ThemeMode) => void;
+  toggleTheme: () => void;
   
   // Draft actions
   saveDraft: (sessionId: string, content: string) => void;
@@ -46,6 +70,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
   },
   drafts: {},
   queuedMessages: [],
+  themeMode: getInitialTheme(),
   
   // Actions
   setSessions: (sessions) => set({ sessions }),
@@ -75,6 +100,19 @@ export const useAppStore = create<AppStore>((set, get) => ({
   }),
   
   setConnection: (connection) => set({ connection }),
+  
+  // Theme actions
+  setThemeMode: (mode) => {
+    localStorage.setItem(THEME_STORAGE_KEY, mode);
+    set({ themeMode: mode });
+  },
+  
+  toggleTheme: () => {
+    const state = get();
+    const newMode = state.themeMode === 'light' ? 'dark' : 'light';
+    localStorage.setItem(THEME_STORAGE_KEY, newMode);
+    set({ themeMode: newMode });
+  },
   
   // Draft actions
   saveDraft: (sessionId, content) => set((state) => ({

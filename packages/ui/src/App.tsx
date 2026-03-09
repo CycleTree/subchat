@@ -1,22 +1,13 @@
-import { useState, useEffect } from 'react';
-import { ThemeProvider, createTheme } from '@mui/material/styles';
+import { useState, useEffect, useMemo } from 'react';
+import { ThemeProvider } from '@mui/material/styles';
 import { CssBaseline, Alert, Box, useMediaQuery } from '@mui/material';
 import { useAppStore } from './store';
+import { createAppTheme, applyCssVariables } from './theme';
 import { OpenClawGateway } from './services/gateway';
 import { SessionList } from './components/SessionList';
 import { ChatView } from './components/ChatView';
 import { SettingsDialog } from './components/SettingsDialog';
 import { testGateway } from './utils/websocketTest';
-
-const theme = createTheme({
-  palette: {
-    primary: { main: '#2563eb', light: '#eff6ff' },
-    background: { default: '#f8fafc' }
-  },
-  typography: {
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-  }
-});
 
 const gateway = new OpenClawGateway();
 
@@ -34,6 +25,7 @@ function App() {
     sessions,
     currentSessionId, 
     connection,
+    themeMode,
     setSessions,
     addMessage,
     setConnection,
@@ -44,6 +36,14 @@ function App() {
 
   const [initError, setInitError] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+
+  // Create theme based on current mode
+  const theme = useMemo(() => createAppTheme(themeMode), [themeMode]);
+
+  // Apply CSS variables when theme changes
+  useEffect(() => {
+    applyCssVariables(themeMode);
+  }, [themeMode]);
 
   // Enhanced function to get gateway token with better error handling
   const getGatewayToken = (): string => {
