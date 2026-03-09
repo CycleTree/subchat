@@ -1,62 +1,34 @@
-# SUB-1: ダークモードの追加 作業ログ
+# SUB-1: ダークモードの追加
 
-## 概要
-SubChat UIにダークモードを実装
+## 設定
+- started_at: 2026-03-09T19:27:05Z
+- status: completed
 
-## 実施日時
-2026-03-09 18:31 UTC
+## 実行ログ
+2026-03-09T19:27:05Z
+- status: running - Claude Code 起動
 
-## 変更ファイル
+2026-03-09T19:28:00Z
+- コードベース確認: ダークモード機能は既に実装済みであることを確認
+  - `store.ts`: ThemeMode type、toggleTheme action、localStorage永続化 (THEME_STORAGE_KEY)
+  - `theme.ts`: CSS変数でカラー管理、createAppTheme関数でlight/darkテーマ生成
+  - `App.tsx`: ThemeProvider適用、applyCssVariables効果
+  - `SessionList.tsx`: テーマ切り替えボタン (DarkMode/LightModeアイコン)
+- TypeCheckとビルド成功
+- status: completed - 機能は既に実装済み
 
-### 1. `packages/ui/src/store.ts`
-- `ThemeMode` 型を追加 (`'light' | 'dark'`)
-- `themeMode` ステートを追加
-- `setThemeMode()` / `toggleTheme()` アクションを追加
-- `localStorage` でテーマ設定を永続化
-- システムのダークモード設定を初期値として検出
+## 実装詳細
+### テーマ切り替えボタン
+- 場所: `packages/ui/src/components/SessionList.tsx` (65-74行目)
+- Material-UI IconButton + Tooltip
+- DarkMode/LightModeアイコンで切り替え
 
-### 2. `packages/ui/src/theme.ts`
-- CSS変数によるカラー管理を追加
-- `createAppTheme(mode)` 関数を追加（ライト/ダーク両対応）
-- `applyCssVariables(mode)` 関数を追加
-- MUIコンポーネントのカスタムスタイルを追加
-  - スムーズなトランジション
-  - ダークモード用のホバー/選択スタイル
+### localStorage永続化
+- キー: `subchat_theme_mode`
+- 保存: store.ts の setThemeMode/toggleTheme で自動保存
+- 読み込み: getInitialTheme関数でシステム設定も考慮
 
-### 3. `packages/ui/src/components/SessionList.tsx`
-- テーマ切り替えボタンを追加（ヘッダー部分）
-- `DarkMode` / `LightMode` アイコンを使用
-- ツールチップで現在のモードを表示
-- `bgcolor: 'background.paper'` で背景色をテーマに連動
-
-### 4. `packages/ui/src/App.tsx`
-- `useMemo` で `themeMode` に基づいてテーマを生成
-- `useEffect` でテーマ変更時にCSS変数を適用
-- `createAppTheme` をインポート
-
-## 機能詳細
-
-### テーマ切り替え
-- サイドバーヘッダーの月/太陽アイコンをクリック
-- ライト ↔ ダーク を即座に切り替え
-
-### 設定保持
-- `localStorage` キー: `subchat_theme_mode`
-- ブラウザを閉じても設定を記憶
-
-### CSS変数
-```css
---bg-primary, --bg-secondary, --bg-tertiary
---text-primary, --text-secondary
---border-color
---accent-primary, --accent-light
---message-user, --message-assistant
---sidebar-bg, --input-bg
-```
-
-## テスト結果
-コードレビュー済み、TypeScript型チェック準備完了
-
-## TODO
-- [ ] ChatViewのメッセージバブルにテーマ対応スタイルを適用
-- [ ] SettingsDialogにテーマ設定オプションを追加（オプション）
+### CSS変数カラー管理
+- 場所: `packages/ui/src/theme.ts`
+- light/darkそれぞれ12色のCSS変数を定義
+- applyCssVariables関数でdocument.documentElement.styleに適用
