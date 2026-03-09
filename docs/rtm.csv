@@ -1,13 +1,8 @@
 ReqID,SortKey,SourceDoc,Title,AC_ID,TestIDs,Evidence,Status,GapType,Owner,Notes
-SUB-1,1,Plane,ダークモード,specs/ac/SUB-1.md,,,Unknown,Untested,,テーマ切替・localStorage保持
-SUB-2,2,Plane,コピー機能,specs/ac/SUB-2.md,,,Unknown,Untested,,メッセージをクリップボードにコピー
-SUB-3,3,Plane,CI修正,specs/ac/SUB-3.md,,,Unknown,Untested,,PR時deployスキップ
-SUB-4,4,Plane,折りたたみ表示,specs/ac/SUB-4.md,,,Unknown,Untested,,長いメッセージの折りたたみ
-SUB-5,5,Plane,セッション一覧表示,specs/ac/SUB-5.md,,,Unknown,Untested,,既存機能
-SUB-6,6,Plane,リアルタイムメッセージ,specs/ac/SUB-6.md,,,Unknown,Untested,,既存機能
-SUB-7,7,Plane,メッセージ送信,specs/ac/SUB-7.md,,,Unknown,Untested,,既存機能
-SUB-8,8,Plane,WebSocket接続,specs/ac/SUB-8.md,,,Unknown,Untested,,既存機能
-SUB-9,9,Plane,Agent階層表示,specs/ac/SUB-9.md,,,Unknown,Untested,,ROADMAP: 未実装
-SUB-10,10,Plane,セッション介入,specs/ac/SUB-10.md,,,Unknown,Untested,,ROADMAP: 未実装
-SUB-11,11,Plane,キルスイッチ,specs/ac/SUB-11.md,,,Unknown,Untested,,ROADMAP: 未実装
-SUB-12,12,Plane,ログ検索,specs/ac/SUB-12.md,,,Unknown,Untested,,ROADMAP: 未実装
+SUB-1,1,Plane,ダークモード,specs/ac/SUB-1.md,E2E-01,,NotRun,Untested,,テーマ切替・localStorage保持
+SUB-2,2,Plane,コピー機能,specs/ac/SUB-2.md,E2E-02,,NotRun,Untested,,メッセージをクリップボードにコピー
+SUB-3,3,Plane,CI修正,specs/ac/SUB-3.md,,,Pass,,DEV:claude,CI設定のみ・テスト不要
+SUB-4,4,Plane,折りたたみ表示,specs/ac/SUB-4.md,E2E-04,,NotRun,Untested,,長いメッセージの折りたたみ
+SUB-5,5,Plane,セッション一覧表示,specs/ac/SUB-5.md,E2E-05,,NotRun,Untested,,既存機能
+SUB-6,6,Plane,キルスイッチ,specs/ac/SUB-6.md,E2E-06,,NotRun,Untested,,セッション強制終了
+SUB-7,7,Plane,セッション介入,specs/ac/SUB-7.md,E2E-07,,NotRun,Untested,,追加指示送信

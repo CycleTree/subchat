@@ -200,7 +200,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
   return (
     <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', height: '100vh' }}>
       {/* Header */}
-      <Paper 
+      <Paper data-testid="message" 
         elevation={0} 
         sx={{ 
           p: 2, 
