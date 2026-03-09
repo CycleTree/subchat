@@ -11,11 +11,14 @@ import {
   CircularProgress,
   useMediaQuery,
   useTheme,
-  Snackbar
+  Snackbar,
+  Button
 } from '@mui/material';
-import { Send, Circle, ArrowBack, ContentCopy } from '@mui/icons-material';
+import { Send, Circle, ArrowBack, ContentCopy, ExpandMore, ExpandLess } from '@mui/icons-material';
 import type { Session, Message } from '../../../shared/src/types';
 import { useAppStore } from '../store';
+
+const COLLAPSE_THRESHOLD = 300;
 
 interface ChatViewProps {
   session: Session | null;
@@ -33,6 +36,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
   const [inputValue, setInputValue] = useState('');
   const [sending, setSending] = useState(false);
   const [copySnackbarOpen, setCopySnackbarOpen] = useState(false);
+  const [expandedMessages, setExpandedMessages] = useState<Set<string>>(new Set());
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
   // Store and responsive setup
@@ -142,6 +146,18 @@ export const ChatView: React.FC<ChatViewProps> = ({
     } catch (error) {
       console.error('Failed to copy message:', error);
     }
+  };
+
+  const toggleMessageExpanded = (messageId: string) => {
+    setExpandedMessages((prev) => {
+      const next = new Set(prev);
+      if (next.has(messageId)) {
+        next.delete(messageId);
+      } else {
+        next.add(messageId);
+      }
+      return next;
+    });
   };
 
   // Dynamic status text based on connection and queue state
@@ -281,10 +297,38 @@ export const ChatView: React.FC<ChatViewProps> = ({
                     borderColor: message.status === 'queued' ? 'warning.main' : 'transparent',
                   }}
                 >
-                  <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
-                    {message.content}
-                  </Typography>
-                  
+                  {message.content.length >= COLLAPSE_THRESHOLD && !expandedMessages.has(message.id) ? (
+                    <>
+                      <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+                        {message.content.slice(0, COLLAPSE_THRESHOLD)}...
+                      </Typography>
+                      <Button
+                        size="small"
+                        onClick={() => toggleMessageExpanded(message.id)}
+                        endIcon={<ExpandMore />}
+                        sx={{ mt: 0.5, p: 0, minWidth: 'auto', textTransform: 'none', fontSize: '0.75rem' }}
+                      >
+                        続きを読む
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+                        {message.content}
+                      </Typography>
+                      {message.content.length >= COLLAPSE_THRESHOLD && (
+                        <Button
+                          size="small"
+                          onClick={() => toggleMessageExpanded(message.id)}
+                          endIcon={<ExpandLess />}
+                          sx={{ mt: 0.5, p: 0, minWidth: 'auto', textTransform: 'none', fontSize: '0.75rem' }}
+                        >
+                          折りたたむ
+                        </Button>
+                      )}
+                    </>
+                  )}
+
                   {/* Message status for pending/queued messages */}
                   {message.status && message.status !== 'sent' && (
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
