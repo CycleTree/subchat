@@ -137,6 +137,12 @@ export const ChatView: React.FC<ChatViewProps> = ({
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault();
+      handleIntervention();
+      return;
+    }
+
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
@@ -310,7 +316,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
             <Stack spacing={1}>
               {interventions.map((entry) => (
                 <Box key={entry.id}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5, flexWrap: 'wrap' }}>
                     <Chip
                       label={entry.status}
                       size="small"
@@ -318,6 +324,14 @@ export const ChatView: React.FC<ChatViewProps> = ({
                       variant="outlined"
                       sx={{ height: 20 }}
                     />
+                    {entry.transport && (
+                      <Chip
+                        label={entry.transport}
+                        size="small"
+                        variant="outlined"
+                        sx={{ height: 20 }}
+                      />
+                    )}
                     <Typography variant="caption" color="text.secondary">
                       {formatTime(entry.timestamp)}
                     </Typography>
@@ -325,6 +339,11 @@ export const ChatView: React.FC<ChatViewProps> = ({
                   <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
                     {entry.content}
                   </Typography>
+                  {entry.error && (
+                    <Typography variant="caption" color="error.main" sx={{ display: 'block', mt: 0.5 }}>
+                      {entry.error}
+                    </Typography>
+                  )}
                   <Divider sx={{ mt: 1 }} />
                 </Box>
               ))}
@@ -454,30 +473,32 @@ export const ChatView: React.FC<ChatViewProps> = ({
       {/* Input */}
       <Box sx={{ p: 2, bgcolor: 'background.paper', borderTop: 1, borderColor: 'divider' }}>
         <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-end' }}>
-          <TextField
-            fullWidth
-            multiline
-            maxRows={3}
-            variant="outlined"
-            placeholder={getPlaceholder()}
-            value={inputValue}
-            onChange={handleInputChange}
-            onKeyPress={handleKeyPress}
-            disabled={sending || sendingIntervention}
-            size="small"
-            error={!isConnected && !sending}
-            helperText={!isConnected ? "Offline mode - messages will be queued" : ""}
-            sx={{
-              '& .MuiOutlinedInput-root': {
-                '&.Mui-error': {
-                  '& fieldset': {
-                    borderColor: 'warning.main',
-                    borderWidth: 1,
+          <Box sx={{ flexGrow: 1 }}>
+            <TextField
+              fullWidth
+              multiline
+              maxRows={3}
+              variant="outlined"
+              placeholder={getPlaceholder()}
+              value={inputValue}
+              onChange={handleInputChange}
+              onKeyDown={handleKeyPress}
+              disabled={sending || sendingIntervention}
+              size="small"
+              error={!isConnected && !sending}
+              helperText={!isConnected ? "Offline mode - messages will be queued" : "Enter: send / Ctrl+Enter: intervene"}
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  '&.Mui-error': {
+                    '& fieldset': {
+                      borderColor: 'warning.main',
+                      borderWidth: 1,
+                    },
                   },
                 },
-              },
-            }}
-          />
+              }}
+            />
+          </Box>
           <IconButton
             onClick={handleSend}
             disabled={!inputValue.trim() || sending || sendingIntervention}
@@ -492,7 +513,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
             disabled={!inputValue.trim() || sending || sendingIntervention || !isConnected}
             color="secondary"
             sx={{ mb: 0.5 }}
-            title={isConnected ? "Send intervention to this session" : "Interventions require a live connection"}
+            title={isConnected ? "Send intervention to this session (Ctrl+Enter)" : "Interventions require a live connection"}
           >
             {sendingIntervention ? <CircularProgress size={20} /> : <Psychology />}
           </IconButton>

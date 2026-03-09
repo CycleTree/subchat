@@ -366,11 +366,18 @@ function App() {
     });
 
     try {
-      await gateway.sendIntervention(currentSessionId, content);
-      updateIntervention(interventionId, { status: 'sent' });
+      const result = await gateway.sendIntervention(currentSessionId, content);
+      updateIntervention(interventionId, {
+        status: 'sent',
+        transport: result.transport,
+        error: undefined
+      });
       console.log('✅ Intervention sent:', content);
     } catch (error) {
-      updateIntervention(interventionId, { status: 'failed' });
+      updateIntervention(interventionId, {
+        status: 'failed',
+        error: error instanceof Error ? error.message : 'Failed to send intervention'
+      });
       console.error('❌ Failed to send intervention:', error);
       throw error;
     }
