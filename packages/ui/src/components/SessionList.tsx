@@ -1,5 +1,5 @@
-// SubChat v2 - Session List Component  
-import React from 'react';
+// SubChat v2 - Session List Component
+import React, { useState } from 'react';
 import {
   List,
   ListItemButton,
@@ -9,9 +9,18 @@ import {
   Badge,
   Chip,
   IconButton,
-  Tooltip
+  Tooltip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
+  Button,
+  Snackbar,
+  Alert,
+  CircularProgress
 } from '@mui/material';
-import { Circle, SmartToy, Settings, DarkMode, LightMode, AccountTree, ViewList } from '@mui/icons-material';
+import { Circle, SmartToy, Settings, DarkMode, LightMode, AccountTree, ViewList, Stop } from '@mui/icons-material';
 import type { Session } from '../services/gateway';
 import { useAppStore } from '../store';
 import { SessionTree } from './SessionTree';
@@ -19,10 +28,41 @@ import { SessionTree } from './SessionTree';
 interface SessionListProps {
   sessions: Session[];
   onOpenSettings?: () => void;
+  onKillSession?: (sessionId: string) => Promise<void>;
 }
 
-export const SessionList: React.FC<SessionListProps> = ({ sessions, onOpenSettings }) => {
+export const SessionList: React.FC<SessionListProps> = ({ sessions, onOpenSettings, onKillSession }) => {
   const { currentSessionId, setCurrentSession, themeMode, toggleTheme, viewMode, toggleViewMode, getSessionTree } = useAppStore();
+
+  const [killTarget, setKillTarget] = useState<Session | null>(null);
+  const [killing, setKilling] = useState(false);
+  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
+    open: false, message: '', severity: 'success'
+  });
+
+  const handleKillClick = (e: React.MouseEvent, session: Session) => {
+    e.stopPropagation();
+    setKillTarget(session);
+  };
+
+  const handleKillConfirm = async () => {
+    if (!killTarget || !onKillSession) return;
+    setKilling(true);
+    try {
+      await onKillSession(killTarget.id);
+      setSnackbar({ open: true, message: `セッション "${killTarget.name}" を終了しました`, severity: 'success' });
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : '不明なエラー';
+      setSnackbar({ open: true, message: `終了に失敗: ${msg}`, severity: 'error' });
+    } finally {
+      setKilling(false);
+      setKillTarget(null);
+    }
+  };
+
+  const handleKillCancel = () => {
+    if (!killing) setKillTarget(null);
+  };
 
   const formatTime = (date: Date) => {
     const now = new Date();
@@ -128,7 +168,6 @@ export const SessionList: React.FC<SessionListProps> = ({ sessions, onOpenSettin
               </ListItemIcon>
 
               <Box sx={{ flexGrow: 1 }}>
-                {/* Session Name Row */}
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <Typography variant="body2" noWrap sx={{ fontWeight: 500, flexGrow: 1 }}>
                     {session.name}
@@ -137,8 +176,6 @@ export const SessionList: React.FC<SessionListProps> = ({ sessions, onOpenSettin
                     <Circle sx={{ fontSize: 8, color: 'success.main' }} />
                   )}
                 </Box>
-
-                {/* Agent & Time Row */}
                 <Box sx={{
                   display: 'flex',
                   alignItems: 'center',
@@ -153,9 +190,7 @@ export const SessionList: React.FC<SessionListProps> = ({ sessions, onOpenSettin
                     sx={{
                       fontSize: '0.7rem',
                       height: 20,
-                      '& .MuiChip-label': {
-                        px: 1
-                      }
+                      '& .MuiChip-label': { px: 1 }
                     }}
                   />
                   <Typography variant="caption" color="text.secondary">
@@ -172,6 +207,24 @@ export const SessionList: React.FC<SessionListProps> = ({ sessions, onOpenSettin
                 >
                   <Box />
                 </Badge>
+              )}
+
+              {session.isActive && onKillSession && (
+                <Tooltip title="セッションを終了">
+                  <IconButton
+                    size="small"
+                    onClick={(e) => handleKillClick(e, session)}
+                    sx={{
+                      ml: 0.5,
+                      color: 'error.main',
+                      opacity: 0.6,
+                      '&:hover': { opacity: 1, bgcolor: 'error.light' }
+                    }}
+                    aria-label={`kill session ${session.name}`}
+                  >
+                    <Stop fontSize="small" />
+                  </IconButton>
+                </Tooltip>
               )}
             </ListItemButton>
           ))}
@@ -192,6 +245,44 @@ export const SessionList: React.FC<SessionListProps> = ({ sessions, onOpenSettin
           OpenClaw Gateway
         </Typography>
       </Box>
+
+      {/* Kill Confirmation Dialog */}
+      <Dialog open={!!killTarget} onClose={handleKillCancel}>
+        <DialogTitle>セッションを終了しますか？</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            セッション <strong>{killTarget?.name}</strong> (Agent: {killTarget?.agentId}) を強制終了します。
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleKillCancel} disabled={killing}>キャンセル</Button>
+          <Button
+            onClick={handleKillConfirm}
+            color="error"
+            variant="contained"
+            disabled={killing}
+            startIcon={killing ? <CircularProgress size={16} color="inherit" /> : <Stop />}
+          >
+            {killing ? '終了中...' : '終了する'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Feedback Snackbar */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={() => setSnackbar(s => ({ ...s, open: false }))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          onClose={() => setSnackbar(s => ({ ...s, open: false }))}
+          severity={snackbar.severity}
+          variant="filled"
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

@@ -17,13 +17,10 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
-  // CI では webServer を使わない (stub テストのため)
-  // 実テスト時は有効化する
-  ...(process.env.CI ? {} : {
-    webServer: {
-      command: 'npm run preview',
-      url: 'http://localhost:4173',
-      reuseExistingServer: true,
-    },
-  }),
+  webServer: {
+    command: 'npx vite preview --port 4173',
+    url: 'http://localhost:4173',
+    reuseExistingServer: !process.env.CI,
+    timeout: 120000,
+  },
 });

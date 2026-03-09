@@ -245,6 +245,20 @@ function App() {
     }
   };
 
+  const handleKillSession = async (sessionId: string): Promise<void> => {
+    try {
+      await gateway.killSession(sessionId);
+      console.log('🛑 Session killed:', sessionId);
+
+      // Refresh session list
+      const updatedSessions = await gateway.getSessions();
+      setSessions(updatedSessions);
+    } catch (error) {
+      console.error('❌ Kill session failed:', error);
+      throw error;
+    }
+  };
+
   const handleSendMessage = async (content: string): Promise<void> => {
     if (!currentSessionId || !connection.isConnected) {
       throw new Error('Not connected or no session selected');
@@ -332,9 +346,10 @@ function App() {
         )}
         
         {showSessionList && (
-          <SessionList 
-            sessions={sessions} 
+          <SessionList
+            sessions={sessions}
             onOpenSettings={() => setSettingsOpen(true)}
+            onKillSession={handleKillSession}
           />
         )}
         
