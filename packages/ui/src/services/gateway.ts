@@ -199,6 +199,26 @@ export class OpenClawGateway {
     console.log('✅ Message sent successfully');
   }
 
+  async killSession(sessionKey: string): Promise<void> {
+    const isDevelopment = typeof window !== 'undefined' && window.location.hostname === 'localhost';
+    const baseUrl = isDevelopment
+      ? 'http://localhost:18792'
+      : 'https://subchat-openclaw-gateway.fly.dev';
+
+    const response = await fetch(`${baseUrl}/api/subagents/kill`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ target: sessionKey })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => response.statusText);
+      throw new Error(`Kill failed: ${errorText}`);
+    }
+
+    console.log('🛑 Session killed:', sessionKey);
+  }
+
   async configureApiKey(provider: string, apiKey: string): Promise<void> {
     console.log(`🔧 Configuring ${provider} API key via config.set...`);
     
